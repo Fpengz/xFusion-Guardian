@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+set -eu
+
+echo "Running pre-commit checks..."
+
+uv run ruff check .
+uv run ruff format --check .
+uv run ty check
+uv run pytest -q
+
+echo "Pre-commit checks passed."
+

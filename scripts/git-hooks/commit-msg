@@ -1,0 +1,24 @@
+#!/usr/bin/env sh
+set -eu
+
+message_file="$1"
+subject="$(sed -n '1p' "$message_file")"
+
+case "$subject" in
+  feat\(*\):*|fix\(*\):*|docs\(*\):*|test\(*\):*|refactor\(*\):*|chore\(*\):*|ci\(*\):*|feat:*|fix:*|docs:*|test:*|refactor:*|chore:*|ci:*)
+    ;;
+  *)
+    echo "Commit subject must use Conventional Commit style."
+    echo "Examples:"
+    echo "  feat(agent): add confirmation gate"
+    echo "  docs(architecture): add LangGraph blueprint"
+    exit 1
+    ;;
+esac
+
+subject_length="$(printf "%s" "$subject" | wc -c | tr -d ' ')"
+if [ "$subject_length" -gt 72 ]; then
+  echo "Commit subject is $subject_length characters; keep it at 72 or fewer."
+  exit 1
+fi
+

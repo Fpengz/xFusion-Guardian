@@ -1,0 +1,16 @@
+# <type>(<scope>): <short imperative summary>
+#
+# Types: feat, fix, docs, test, refactor, chore, ci
+# Scope examples: agent, policy, tools, verification, docs, git
+#
+# Body:
+# - What changed?
+# - Why?
+# - Any safety, verification, or demo impact?
+#
+# Verification:
+# - uv run pytest -q
+# - uv run ruff check .
+# - uv run ruff format --check .
+# - uv run ty check
+#
