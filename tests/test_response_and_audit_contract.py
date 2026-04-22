@@ -89,6 +89,22 @@ def test_jsonl_audit_file_receives_step_records(tmp_path) -> None:
     assert record["status"] == "success"
 
 
+def test_jsonl_audit_file_receives_refusal_records(tmp_path) -> None:
+    audit_path = tmp_path / "audit.jsonl"
+    state = make_graph_state("Delete everything in /etc", audit_log_path=str(audit_path))
+
+    assert state["plan"].interaction_state == InteractionState.REFUSED
+    lines = audit_path.read_text(encoding="utf-8").splitlines()
+    assert lines
+
+    record = json.loads(lines[-1])
+    assert record["plan_id"] == state["plan"].plan_id
+    assert record["step_id"] == "delete_path"
+    assert record["action_taken"]["tool"] == "cleanup.safe_disk_cleanup"
+    assert record["status"] == "refused"
+    assert "protected" in record["summary"].lower()
+
+
 def test_audit_logger_writes_required_schema(tmp_path) -> None:
     sink = JsonlAuditSink(str(tmp_path / "manual.jsonl"))
     logger = AuditLogger(sink)
