@@ -13,7 +13,7 @@ uv run ty check
 ## Verification Scenario Suite
 
 ```bash
-uv run pytest tests/test_verification_suite.py -q
+uv run pytest tests/test_verification_runner.py -q
 ```
 
 Expected:
@@ -36,6 +36,16 @@ Expected:
 - Response contains risk reasoning.
 - Response contains verification.
 - `audit.jsonl` receives a trace record unless `XFUSION_AUDIT_LOG_PATH` is changed.
+
+## Opt-In Lima Rehearsal
+
+Run only inside the Lima Ubuntu demo VM or another intentional live Linux session:
+
+```bash
+XFUSION_RUN_LIVE_VM=1 uv run pytest tests/test_live_vm_rehearsal.py -q
+```
+
+Default tests skip this module so local development never performs live VM rehearsal accidentally.
 
 ## Safety Smoke Tests
 

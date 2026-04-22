@@ -37,7 +37,16 @@ export XFUSION_AUDIT_LOG_PATH=audit.jsonl
 uv run xfusion
 ```
 
+## Run Opt-In Rehearsal Smoke
+
+Inside the VM:
+
+```bash
+XFUSION_RUN_LIVE_VM=1 uv run pytest tests/test_live_vm_rehearsal.py -q
+```
+
+The live rehearsal is skipped by default outside this explicit opt-in.
+
 ## Fallback
 
 If Lima setup fails, Multipass Ubuntu is acceptable. Docker is acceptable only for development smoke tests, not for the official demo, because container behavior differs from a real server OS for systemd, sudo, users, and process management.
-

@@ -59,6 +59,11 @@ expected:
 ## Run
 
 ```bash
-uv run pytest tests/test_verification_suite.py -q
+uv run pytest tests/test_verification_runner.py -q
 ```
 
+Opt-in live rehearsal:
+
+```bash
+XFUSION_RUN_LIVE_VM=1 uv run pytest tests/test_live_vm_rehearsal.py -q
+```
