@@ -63,5 +63,9 @@ def _next_recommendation(state: AgentGraphState) -> str:
     if plan.interaction_state == InteractionState.FAILED:
         return "Review the verification failure before retrying."
     if plan.interaction_state == InteractionState.COMPLETED:
+        if "disk" in plan.goal.lower() and (
+            "clean" in plan.goal.lower() or "full" in plan.goal.lower()
+        ):
+            return "Consider preventive monitoring for disk pressure and cleanup candidate growth."
         return "Review the verification result and audit log before taking follow-up action."
     return "Continue with the next safe planned step."

@@ -21,6 +21,7 @@ def evaluate_policy(
         or tool == "system.current_user"
         or tool == "system.service_status"
         or tool.startswith("disk.check")
+        or tool.startswith("disk.find")
         or tool.startswith("file.search")
         or tool.startswith("file.preview")
         or tool.startswith("process.list")
@@ -86,11 +87,18 @@ def evaluate_policy(
 
     # Cleanup is medium risk
     if tool == "cleanup.safe_disk_cleanup":
+        if parameters.get("execute") is not True:
+            return PolicyDecision(
+                risk_level=RiskLevel.LOW,
+                allowed=True,
+                requires_confirmation=False,
+                reason="Cleanup preview is read-only and bounded to approved candidates.",
+            )
         return PolicyDecision(
             risk_level=RiskLevel.MEDIUM,
             allowed=True,
             requires_confirmation=True,
-            reason="File cleanup can result in data loss and requires confirmation.",
+            reason="File cleanup deletes approved candidates and requires confirmation.",
         )
 
     # Default to forbidden for unknown mutating tools
