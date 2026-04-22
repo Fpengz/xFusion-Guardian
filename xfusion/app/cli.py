@@ -13,7 +13,7 @@ from xfusion.tools.system import SystemTools
 
 def main() -> None:
     """XFusion Guardian CLI Entrypoint."""
-    load_settings()
+    settings = load_settings()
     runner = CommandRunner()
 
     system_tools = SystemTools(runner)
@@ -45,6 +45,7 @@ def main() -> None:
         "pending_confirmation_phrase": None,
         "response": "",
         "audit_records": [],
+        "audit_log_path": settings.audit_log_path,
     }
 
     while True:
