@@ -15,11 +15,11 @@ The current implementation includes:
 - interaction states
 - deterministic policy engine
 - context-aware risk classification
-- short-lived session memory
+- short-lived graph state for active plans
 - typed confirmation boundaries
 - scoped tool router
 - verification flow
-- append-only JSONL audit traces
+- append-only JSONL audit traces via `XFUSION_AUDIT_LOG_PATH`
 - CLI entrypoint
 - OpenAI-compatible LLM client scaffold
 
@@ -66,29 +66,30 @@ Submission and demo docs:
 
 Agent architecture docs:
 
-- [docs/architecture/pydantic-langgraph-blueprint.md](docs/architecture/pydantic-langgraph-blueprint.md): post-v0.1 target architecture using Pydantic v2 and LangGraph.
+- [docs/architecture/pydantic-langgraph-blueprint.md](docs/architecture/pydantic-langgraph-blueprint.md): current Pydantic v2 + LangGraph architecture and next-step blueprint.
 - [docs/tools.md](docs/tools.md): v0.1 tool surface and guarantees.
 - [docs/prompts/core-agent-prompt.md](docs/prompts/core-agent-prompt.md): documented LLM boundary and core agent prompt.
 
 Core code:
 
-- [xfusion/models.py](xfusion/models.py): execution plans, steps, states, and response models.
-- [xfusion/agent.py](xfusion/agent.py): adaptive agent loop.
-- [xfusion/planner.py](xfusion/planner.py): request-to-plan construction.
-- [xfusion/parser.py](xfusion/parser.py): deterministic v0.1 intent parsing.
-- [xfusion/policy.py](xfusion/policy.py): deterministic risk policy.
-- [xfusion/environment.py](xfusion/environment.py): Linux environment sensing model.
-- [xfusion/tools.py](xfusion/tools.py): scoped tool router and verification hooks.
-- [xfusion/memory.py](xfusion/memory.py): short-lived session memory.
-- [xfusion/audit.py](xfusion/audit.py): JSONL audit trace writer.
-- [xfusion/cli.py](xfusion/cli.py): CLI entrypoint and response formatting.
-- [xfusion/llm.py](xfusion/llm.py): OpenAI-compatible client scaffold.
+- [xfusion/domain/models](xfusion/domain/models): Pydantic contracts for plans, environment, policy, verification, audit, and scenarios.
+- [xfusion/graph](xfusion/graph): LangGraph state, nodes, wiring, response formatting, and audit event helpers.
+- [xfusion/policy](xfusion/policy): deterministic policy, protected path checks, and confirmation helpers.
+- [xfusion/tools](xfusion/tools): scoped typed tools for system, disk, file, process, user, and cleanup operations.
+- [xfusion/audit](xfusion/audit): JSONL audit trace writer.
+- [xfusion/app/cli.py](xfusion/app/cli.py): CLI entrypoint.
+- [xfusion/llm/client.py](xfusion/llm/client.py): OpenAI-compatible client scaffold.
 
 Tests:
 
-- [tests/test_core_contracts.py](tests/test_core_contracts.py): planning, policy, memory, audit, and workflow contracts.
-- [tests/test_cli_contracts.py](tests/test_cli_contracts.py): CLI response contract.
-- [tests/test_verification_suite.py](tests/test_verification_suite.py): YAML scenario schema and static/fake-tool verification checks.
+- [tests/test_smoke.py](tests/test_smoke.py): CLI and graph smoke tests.
+- [tests/test_plan_correctness.py](tests/test_plan_correctness.py): plan shape, dependency, refusal, and abort behavior.
+- [tests/test_data_flow.py](tests/test_data_flow.py): step-output data flow across workflows.
+- [tests/test_safety_invariants.py](tests/test_safety_invariants.py): confirmation and verification invariants.
+- [tests/test_response_and_audit_contract.py](tests/test_response_and_audit_contract.py): judge response contract and JSONL audit persistence.
+- [tests/test_workflow_completion.py](tests/test_workflow_completion.py): demo workflow completion tests.
+- [tests/test_verification_runner.py](tests/test_verification_runner.py): YAML scenario static/fake-tool checks.
+- [tests/test_live_vm_rehearsal.py](tests/test_live_vm_rehearsal.py): opt-in Lima/live-session rehearsal smoke.
 
 ## Architecture Invariants
 
@@ -139,6 +140,19 @@ Context matters. For example, bounded log cleanup can be more reasonable under h
 - Docker is acceptable for development smoke tests only, not for the official demo.
 
 The current parser is deterministic for v0.1 stability. If wiring in LLM-based parsing, keep the deterministic policy and tool authorization boundary intact.
+
+## Roadmap Status
+
+| Area | Status |
+| --- | --- |
+| Pydantic + LangGraph control loop | implemented |
+| Exact typed confirmation | implemented |
+| Mandatory verification | implemented |
+| Persistent JSONL audit logs | implemented |
+| Seven-scenario demo spine | implemented |
+| Safe cleanup | implemented with limitations: approved demo/temp candidates only |
+| Live VM rehearsal | implemented with limitations: opt-in smoke test, not default |
+| SSH/web/voice/persistent memory/multi-agent orchestration | future |
 
 ## Development Workflow
 

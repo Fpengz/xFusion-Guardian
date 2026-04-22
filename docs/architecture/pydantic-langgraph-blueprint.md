@@ -1,8 +1,8 @@
 # Pydantic v2 + LangGraph Architecture Blueprint
 
-This document defines the target architecture for evolving XFusion from the current dataclass/custom-loop v0.1 into a **Pydantic v2 + LangGraph-first architecture**, with LangChain used only as optional integration glue.
+This document defines the current and target architecture for XFusion's **Pydantic v2 + LangGraph-first architecture**, with LangChain used only as optional integration glue.
 
-This is a post-v0.1 blueprint. It does not describe the current implementation one-to-one, and it should not be treated as a refactor already completed.
+The v0.1 implementation now uses this stack. Some sections below remain blueprint-level guidance for future refinements, but the package layout, core contracts, and graph loop are the current baseline.
 
 ## References
 
@@ -633,7 +633,7 @@ def run_fake_tool_scenario(scenario: VerificationScenario) -> ScenarioResult:
     ...
 ```
 
-## Migration Mapping
+## Historical Migration Mapping
 
 | Current file | Target location |
 | --- | --- |
@@ -699,4 +699,3 @@ Each step must preserve:
 - Do not add graph persistence during the first orchestration refactor.
 - Do not broaden shell execution beyond registered typed tools.
 - Do not move to a web UI as part of this architecture migration.
-

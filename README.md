@@ -161,6 +161,15 @@ the dangerous decisions inspectable and controllable.
 
 ## Status
 
-v0.1 baseline is implemented and tested. The post-v0.1 direction is documented
-in the Pydantic + LangGraph architecture blueprint; future work should migrate
-incrementally while preserving the verification suite and safety invariants.
+v0.1 judge-ready demo spine is implemented and tested. The Pydantic + LangGraph
+architecture blueprint documents the current baseline plus future refinements.
+
+| Area | Status |
+| --- | --- |
+| Explicit plan-executing graph | implemented |
+| Deterministic policy and exact confirmation | implemented |
+| Persistent JSONL audit logs | implemented |
+| Seven acceptance demo scenarios | implemented |
+| Safe cleanup | implemented with limitations: approved demo/temp candidates only |
+| Live VM rehearsal | implemented with limitations: opt-in, skipped by default |
+| SSH, web UI, voice, persistent memory, multi-agent orchestration | future |

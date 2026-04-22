@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from xfusion.domain.enums import InteractionState
+from xfusion.graph.auditing import log_graph_event
 from xfusion.graph.state import AgentGraphState
 from xfusion.policy.rules import evaluate_policy
 
@@ -28,14 +29,38 @@ def policy_node(state: AgentGraphState) -> AgentGraphState:
 
     if not decision.allowed:
         state.plan.interaction_state = InteractionState.REFUSED
+        state.plan.status = "refused"
         state.response = f"I cannot execute this step: {decision.reason}"
+        log_graph_event(
+            state,
+            step=step,
+            status="refused",
+            summary=state.response,
+            action_taken={
+                "tool": step.tool,
+                "parameters": step.parameters,
+                "policy_decision": decision.model_dump(),
+            },
+        )
     elif decision.requires_confirmation:
         state.plan.interaction_state = InteractionState.AWAITING_CONFIRMATION
+        state.plan.status = "awaiting_confirmation"
         # Requirements: Exact typed confirmation phrase is required.
         # Format: "I understand the risks of <intent>"
         phrase = f"I understand the risks of {step.intent}"
         step.confirmation_phrase = phrase
         state.pending_confirmation_phrase = phrase
         state.response = f"This action requires confirmation. Please type: '{phrase}'"
+        log_graph_event(
+            state,
+            step=step,
+            status="awaiting_confirmation",
+            summary=state.response,
+            action_taken={
+                "tool": step.tool,
+                "parameters": step.parameters,
+                "policy_decision": decision.model_dump(),
+            },
+        )
 
     return state

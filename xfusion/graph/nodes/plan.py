@@ -46,21 +46,86 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
                 fallback_action="Report failure and stop.",
             )
         )
-    elif ("disk" in user_input and "clean" in user_input) or (
+    elif ("disk" in user_input and ("clean" in user_input or "full" in user_input)) or (
         "磁盘" in user_input and "清" in user_input
     ):
-        steps.append(
-            PlanStep(
-                step_id="preview_safe_cleanup",
-                intent="Preview safe disk cleanup candidates.",
-                tool="cleanup.safe_disk_cleanup",
-                parameters={"path": "/tmp"},
-                expected_output="Bounded cleanup candidates are previewed.",
-                verification_method="filesystem_metadata_recheck",
-                success_condition="Cleanup candidates are previewed before deletion.",
-                failure_condition="Cleanup candidates cannot be previewed safely.",
-                fallback_action="Report failure and stop.",
-            )
+        cleanup_paths = ["/tmp", "/var/tmp"]
+        steps.extend(
+            [
+                PlanStep(
+                    step_id="check_disk_pressure",
+                    intent="Check disk pressure before cleanup.",
+                    tool="disk.check_usage",
+                    parameters={"path": "/"},
+                    expected_output="Disk usage and pressure are reported.",
+                    verification_method="state_re_read",
+                    success_condition="Disk usage is reported.",
+                    failure_condition="Could not check disk pressure.",
+                    fallback_action="Report failure and stop.",
+                ),
+                PlanStep(
+                    step_id="find_large_candidates",
+                    intent="Identify bounded cleanup contributors.",
+                    tool="disk.find_large_directories",
+                    parameters={"path": "/tmp", "limit": 10},
+                    dependencies=["check_disk_pressure"],
+                    expected_output="Candidate contributors are listed.",
+                    verification_method="filesystem_metadata_recheck",
+                    success_condition="Large directory scan returns bounded results.",
+                    failure_condition="Large directory scan fails.",
+                    fallback_action="Continue with safe demo-cache preview.",
+                ),
+                PlanStep(
+                    step_id="preview_safe_cleanup",
+                    intent="Preview safe cleanup candidates.",
+                    tool="cleanup.safe_disk_cleanup",
+                    parameters={
+                        "approved_paths": cleanup_paths,
+                        "candidate_class": "demo_cache",
+                        "older_than_days": 0,
+                        "max_files": 20,
+                        "max_bytes": 50_000_000,
+                        "execute": False,
+                    },
+                    dependencies=["find_large_candidates"],
+                    expected_output="Bounded cleanup candidates are previewed.",
+                    verification_method="filesystem_metadata_recheck",
+                    success_condition="Cleanup candidates are previewed before deletion.",
+                    failure_condition="Cleanup candidates cannot be previewed safely.",
+                    fallback_action="Report failure and stop.",
+                ),
+                PlanStep(
+                    step_id="execute_safe_cleanup",
+                    intent="Delete only approved previewed cleanup candidates.",
+                    tool="cleanup.safe_disk_cleanup",
+                    parameters={
+                        "approved_paths": cleanup_paths,
+                        "candidate_class": "demo_cache",
+                        "older_than_days": 0,
+                        "max_files": 20,
+                        "max_bytes": 50_000_000,
+                        "execute": True,
+                    },
+                    dependencies=["preview_safe_cleanup"],
+                    expected_output="Approved cleanup candidates are deleted.",
+                    verification_method="command_exit_status_plus_state",
+                    success_condition="Cleanup reports deleted candidates or safe no-op.",
+                    failure_condition="Cleanup execution fails.",
+                    fallback_action="Abort and preserve remaining files.",
+                ),
+                PlanStep(
+                    step_id="verify_disk_after_cleanup",
+                    intent="Verify disk state after cleanup.",
+                    tool="disk.check_usage",
+                    parameters={"path": "/"},
+                    dependencies=["execute_safe_cleanup"],
+                    expected_output="Disk usage is re-read after cleanup.",
+                    verification_method="state_re_read",
+                    success_condition="Disk usage is reported after cleanup.",
+                    failure_condition="Could not verify disk state after cleanup.",
+                    fallback_action="Report cleanup result with verification warning.",
+                ),
+            ]
         )
     elif "disk" in user_input or "磁盘" in user_input or "空间" in user_input:
         steps.append(
@@ -88,6 +153,21 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
                 success_condition="RAM usage is reported.",
                 failure_condition="Could not check RAM usage.",
                 fallback_action="Report failure and stop.",
+            )
+        )
+    elif "preview metadata for" in user_input:
+        path = state.user_input.split("for", 1)[1].strip(" .") or "."
+        steps.append(
+            PlanStep(
+                step_id="preview_metadata",
+                intent=f"Preview metadata for {path}.",
+                tool="file.preview_metadata",
+                parameters={"path": path},
+                expected_output="Path metadata without file contents.",
+                verification_method="filesystem_metadata_recheck",
+                success_condition="Metadata preview returns existence and path facts.",
+                failure_condition="Metadata preview fails.",
+                fallback_action="Ask for an exact path.",
             )
         )
     elif "search for" in user_input or "find files named" in user_input:

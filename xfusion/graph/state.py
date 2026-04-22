@@ -25,3 +25,4 @@ class AgentGraphState(BaseModel):
     pending_confirmation_phrase: str | None = None
     response: str = ""
     audit_records: list[dict[str, object]] = Field(default_factory=list)
+    audit_log_path: str | None = None

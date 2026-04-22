@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 from xfusion.domain.enums import InteractionState, StepStatus
+from xfusion.graph.auditing import log_graph_event
 from xfusion.graph.state import AgentGraphState
 
 
@@ -13,17 +12,21 @@ def update_node(state: AgentGraphState) -> AgentGraphState:
 
     # Create audit record
     if state.current_step_id:
-        record = {
-            "timestamp": datetime.now().isoformat(),
-            "plan_id": state.plan.plan_id,
-            "step_id": state.current_step_id,
-            "interaction_state": state.plan.interaction_state,
-            "verification_result": state.verification_result.model_dump()
-            if state.verification_result
-            else {},
-            "status": state.plan.status,
-        }
-        state.audit_records.append(record)
+        step = next(
+            (
+                candidate
+                for candidate in state.plan.steps
+                if candidate.step_id == state.current_step_id
+            ),
+            None,
+        )
+        if step:
+            log_graph_event(
+                state,
+                step=step,
+                status=str(step.status),
+                summary=state.response,
+            )
 
     # Check if plan is complete or blocked
     if state.plan.interaction_state == InteractionState.EXECUTING:

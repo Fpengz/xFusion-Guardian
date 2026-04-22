@@ -155,13 +155,18 @@
   safe_for_live_execution: true
   notes: "Acceptance demo scenario 7 wow workflow, static planning layer."
   expected:
-    plan_length: 1
-    plan_tools: ["cleanup.safe_disk_cleanup"]
+    plan_length: 5
+    plan_tools:
+      - "disk.check_usage"
+      - "disk.find_large_directories"
+      - "cleanup.safe_disk_cleanup"
+      - "cleanup.safe_disk_cleanup"
+      - "disk.check_usage"
     executed_tools: []
     risk_level: medium
     interaction_state: awaiting_confirmation
     requires_confirmation: true
-    verification_method: filesystem_metadata_recheck
+    verification_method: state_re_read
     verification_outcome: cleanup_candidates_previewed
     final_status: awaiting_confirmation
     outcome_contains: ["cleanup"]

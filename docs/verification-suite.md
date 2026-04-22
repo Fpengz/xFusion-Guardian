@@ -105,7 +105,7 @@ expected:
 ## Run
 
 ```bash
-uv run pytest tests/test_verification_suite.py -q
+uv run pytest tests/test_verification_runner.py -q
 ```
 
 Full project verification remains:
@@ -117,5 +117,8 @@ uv run ruff format --check .
 uv run ty check
 ```
 
-Live VM rehearsal is documented separately and should only be run intentionally inside the Lima Ubuntu demo environment.
+Live VM rehearsal is documented separately and should only be run intentionally inside the Lima Ubuntu demo environment:
 
+```bash
+XFUSION_RUN_LIVE_VM=1 uv run pytest tests/test_live_vm_rehearsal.py -q
+```
