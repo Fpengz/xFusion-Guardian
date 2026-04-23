@@ -9,11 +9,11 @@ from xfusion.graph.state import AgentGraphState
 
 
 def plan_node(state: AgentGraphState) -> AgentGraphState:
-    """Create or revise ExecutionPlan."""
+    """Create a deterministic v0.2 ExecutionPlan draft for known demo workflows."""
     if state.plan:
         return state
 
-    # Deterministic planning for common v0.1 scenarios
+    # Deterministic planning for common bounded scenarios; static validation is authoritative.
     user_input = state.user_input.lower()
 
     steps = []
@@ -112,6 +112,7 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
                     success_condition="Cleanup reports deleted candidates or safe no-op.",
                     failure_condition="Cleanup execution fails.",
                     fallback_action="Abort and preserve remaining files.",
+                    verification_step_ids=["verify_disk_after_cleanup"],
                 ),
                 PlanStep(
                     step_id="verify_disk_after_cleanup",
@@ -240,13 +241,14 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
                 step_id="kill_process",
                 intent=f"Stop the process found on port {port}.",
                 tool="process.kill",
-                parameters={"pid": {"ref": "find_process.pids[0]"}, "port": port},
+                parameters={"pid": "$steps.find_process.outputs.pids[0]", "port": port},
                 dependencies=["find_process"],
                 expected_output=f"Process on port {port} is stopped.",
                 verification_method="command_exit_status_plus_state",
                 success_condition=f"Process on port {port} is killed.",
                 failure_condition=f"Process on port {port} is still running.",
                 fallback_action="stop",
+                verification_step_ids=["verify_port_free"],
             )
         )
 
@@ -340,11 +342,24 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
         state.response = clarification
         return state
 
+    mutating_tools = {
+        "process.kill",
+        "user.create",
+        "user.delete",
+        "cleanup.safe_disk_cleanup",
+    }
+    verification_strategy = (
+        "Verify mutating workflow outcomes with planned post-action checks."
+        if any(step.tool in mutating_tools for step in steps)
+        else None
+    )
+
     state.plan = ExecutionPlan(
         plan_id=str(uuid.uuid4()),
         goal=goal,
         language=state.language,
         interaction_state=InteractionState.EXECUTING,
         steps=steps,
+        verification_strategy=verification_strategy,
     )
     return state

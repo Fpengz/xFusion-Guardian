@@ -42,13 +42,13 @@ class ProcessTools:
             summary=f"Failed to list processes: {res.stderr}", data={"error": res.stderr}
         )
 
-    def kill(self, pid: int, signal: int = 15, port: int | None = None) -> ToolOutput:
+    def kill(self, pid: int, signal: str = "TERM", port: int | None = None) -> ToolOutput:
         """Send signal to a resolved PID."""
         res = self.runner.run(["kill", f"-{signal}", str(pid)])
         if res.exit_code == 0:
             return ToolOutput(
                 summary=f"Sent signal {signal} to PID {pid}.",
-                data={"pid": pid, "signal": signal, "port": port},
+                data={"ok": True, "pid": pid, "signal": signal, "port": port},
             )
         return ToolOutput(
             summary=f"Failed to kill PID {pid}: {res.stderr}", data={"error": res.stderr}

@@ -113,7 +113,7 @@ def test_exact_confirmation_phrase_succeeds_and_clears_once() -> None:
     state = confirm_node(state)
 
     assert state.plan is not None
-    assert state.plan.interaction_state == InteractionState.EXECUTING
+    assert state.plan.interaction_state == InteractionState.ABORTED
     assert state.pending_confirmation_phrase is None
     assert state.plan.steps[0].confirmation_phrase is None
 

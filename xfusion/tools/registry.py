@@ -39,6 +39,7 @@ class ToolRegistry:
             "disk.find_large_directories": disk_tools.find_large_directories,
             "file.search": file_tools.search,
             "file.preview_metadata": file_tools.preview_metadata,
+            "file.read_file": file_tools.read_file,
             "process.list": process_tools.list,
             "process.find_by_port": process_tools.find_by_port,
             "process.kill": process_tools.kill,

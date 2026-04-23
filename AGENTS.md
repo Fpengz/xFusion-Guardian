@@ -1,29 +1,42 @@
 # XFusion Agent/Engineer Guide
 
-This repo contains **XFusion v0.1**, a safety-aware Linux administration agent for the AI Hackathon 2026 preliminary problem. The goal is not to build a generic shell wrapper. The goal is a deterministic, policy-governed, plan-executing system agent that can manage a real Linux server through natural language while remaining auditable and controllable.
+This repo contains **XFusion v0.2**, a capability-governed Linux operations
+agent for the AI Hackathon 2026 preliminary problem. The goal is not to build a
+generic shell wrapper. The goal is a deterministic, policy-governed,
+plan-executing system agent that can manage a real Linux server through natural
+language while remaining auditable and controllable.
 
 ## Current Status
 
-v0.1 is a Python CLI-first implementation. The frozen product/technical spec is the source of truth:
+v0.2 is a Python CLI-first implementation. The only normative product and
+technical spec is:
 
-- [docs/specs/xfusion-v0.1.md](docs/specs/xfusion-v0.1.md)
+- [docs/specs/xfusion-v0.2.md](docs/specs/xfusion-v0.2.md)
+
+Historical legacy materials live under [docs/archive/v0.1](docs/archive/v0.1)
+and are explicitly non-normative.
 
 The current implementation includes:
 
-- explicit `ExecutionPlan` and step model
-- dependency enforcement
-- interaction states
+- capability-governed `ExecutionPlan` and step contracts
+- dependency and reference enforcement
 - deterministic policy engine
-- context-aware risk classification
-- short-lived graph state for active plans
-- typed confirmation boundaries
-- scoped tool router
+- approval records bound to typed confirmations and action fingerprints
+- controlled adapter runtime
+- XFusion Capability Schema validation for capability input/output contracts
+- output normalization and redaction before general-purpose exposure
 - verification flow
+- final responses derived from authoritative audit state
 - append-only JSONL audit traces via `XFUSION_AUDIT_LOG_PATH`
 - CLI entrypoint
 - OpenAI-compatible LLM client scaffold
 
-The LLM boundary is intentionally narrow. The LLM may help with language understanding, ambiguity support, plan drafting, and response wording. Policy classification, dependency enforcement, confirmation rules, execution permission, and final tool authorization remain deterministic.
+The LLM boundary is intentionally narrow. The model may help with request
+understanding, ambiguity support, plan drafting, diagnosis suggestions,
+verification suggestions, and response wording. Policy classification,
+dependency enforcement, reference resolution, approval rules, schema validation,
+execution permission, redaction, audit state, and final capability
+authorization remain deterministic.
 
 ## Project Commands
 
@@ -53,35 +66,34 @@ uv run ty check
 Start here:
 
 - [README.md](README.md): short project overview and development commands.
-- [docs/specs/xfusion-v0.1.md](docs/specs/xfusion-v0.1.md): frozen v0.1 spec and acceptance criteria.
+- [docs/specs/xfusion-v0.2.md](docs/specs/xfusion-v0.2.md): normative v0.2 spec.
+- [docs/architecture/capability-schema.md](docs/architecture/capability-schema.md): XFusion Capability Schema contract.
+- [docs/release-readiness-v0.2.md](docs/release-readiness-v0.2.md): reviewer notes.
 - [problem_statement.pdf](problem_statement.pdf): original contest problem statement.
 
-Submission and demo docs:
+Supporting docs:
 
-- [docs/demo-script.md](docs/demo-script.md): seven-scenario acceptance demo.
-- [docs/sandbox-lima.md](docs/sandbox-lima.md): official Lima Ubuntu VM demo sandbox notes.
-- [docs/self-test.md](docs/self-test.md): local and VM self-test checklist.
 - [docs/verification-suite.md](docs/verification-suite.md): standardized YAML scenario suite.
 - [verification/README.md](verification/README.md): verification suite editing guide.
-
-Agent architecture docs:
-
-- [docs/architecture/pydantic-langgraph-blueprint.md](docs/architecture/pydantic-langgraph-blueprint.md): current Pydantic v2 + LangGraph architecture and next-step blueprint.
-- [docs/tools.md](docs/tools.md): v0.1 tool surface and guarantees.
-- [docs/prompts/core-agent-prompt.md](docs/prompts/core-agent-prompt.md): documented LLM boundary and core agent prompt.
+- [docs/archive/v0.1](docs/archive/v0.1): historical, non-normative legacy materials.
 
 Core code:
 
-- [xfusion/domain/models](xfusion/domain/models): Pydantic contracts for plans, environment, policy, verification, audit, and scenarios.
-- [xfusion/graph](xfusion/graph): LangGraph state, nodes, wiring, response formatting, and audit event helpers.
-- [xfusion/policy](xfusion/policy): deterministic policy, protected path checks, and confirmation helpers.
-- [xfusion/tools](xfusion/tools): scoped typed tools for system, disk, file, process, user, and cleanup operations.
+- [xfusion/domain/models](xfusion/domain/models): Pydantic contracts for plans, environment, policy, verification, audit, capabilities, and scenarios.
+- [xfusion/capabilities](xfusion/capabilities): capability registry and schema contract validation.
+- [xfusion/planning](xfusion/planning): static plan validation and reference resolution.
+- [xfusion/execution](xfusion/execution): controlled runtime and command runner.
+- [xfusion/graph](xfusion/graph): LangGraph state, nodes, wiring, response formatting, and audit helpers.
+- [xfusion/policy](xfusion/policy): deterministic policy, approval, protected path checks, and confirmation helpers.
+- [xfusion/tools](xfusion/tools): scoped typed adapters for system, disk, file, process, user, and cleanup operations.
 - [xfusion/audit](xfusion/audit): JSONL audit trace writer.
 - [xfusion/app/cli.py](xfusion/app/cli.py): CLI entrypoint.
 - [xfusion/llm/client.py](xfusion/llm/client.py): OpenAI-compatible client scaffold.
 
 Tests:
 
+- [tests/test_v02_contracts.py](tests/test_v02_contracts.py): v0.2 plan, approval, role, and runtime contracts.
+- [tests/test_v02_hardening.py](tests/test_v02_hardening.py): safety hardening, schema contract, redaction, audit, and documentation invariants.
 - [tests/test_smoke.py](tests/test_smoke.py): CLI and graph smoke tests.
 - [tests/test_plan_correctness.py](tests/test_plan_correctness.py): plan shape, dependency, refusal, and abort behavior.
 - [tests/test_data_flow.py](tests/test_data_flow.py): step-output data flow across workflows.
@@ -93,28 +105,31 @@ Tests:
 
 ## Architecture Invariants
 
-Preserve these unless the frozen spec is intentionally revised:
+Preserve these unless the v0.2 spec is intentionally revised:
 
 - No arbitrary shell passthrough.
 - Every request becomes an `ExecutionPlan`, even one-step requests.
+- Each step invokes exactly one registered capability.
 - A step cannot execute unless all dependencies succeeded.
-- Medium/high-risk actions require exact typed confirmation.
-- Confirmations never persist across plans.
+- References must use `$steps.<step_id>.outputs.<field>` and resolve only from authorized upstream outputs.
+- Capability input/output schemas are authoritative and fail closed when unsupported or malformed.
+- Mutating actions require policy approval before execution.
+- Approval is invalidated on material change.
 - Memory is short-lived and scoped to the active session/plan.
-- Tools accept structured input and return structured output.
-- Mutating tools require policy approval before execution.
+- Tools/adapters accept structured input and return structured output.
+- Output is normalized and redacted before model-visible, user-visible, or general-purpose audit/log exposure.
 - Verification is mandatory after execution.
-- Audit traces must map intent to plan, step, action, state changes, verification, and outcome.
+- Final responses derive from authoritative audit state.
 - The agent must ask clarification instead of guessing when target, scope, or risk boundary is unclear.
 
 ## Safety Model
 
-Risk levels:
+Risk tiers:
 
-- `low`: read-only inspection, usually executes directly.
-- `medium`: bounded state-changing actions, requires typed confirmation.
-- `high`: suspicious or broad actions, requires stricter handling or refusal.
-- `forbidden`: protected paths, unsafe privilege changes, or unsupported tools; always refused.
+- `tier_0`: read-only inspection within validated scope.
+- `tier_1`: bounded reversible mutation, requires human approval.
+- `tier_2`: high-risk mutation, requires admin approval or denial.
+- `tier_3`: prohibited or broad-impact operation, denied.
 
 Protected targets include:
 
@@ -127,7 +142,9 @@ Protected targets include:
 - broad recursive permission changes
 - unclear destructive operations
 
-Context matters. For example, bounded log cleanup can be more reasonable under high disk pressure than when disk pressure is normal. Keep risk reasoning grounded in `EnvironmentModel`.
+Context matters. For example, bounded log cleanup can be more reasonable under
+high disk pressure than when disk pressure is normal. Keep risk reasoning
+grounded in `EnvironmentModel`.
 
 ## Implementation Notes
 
@@ -139,20 +156,9 @@ Context matters. For example, bounded log cleanup can be more reasonable under h
 - Official demo sandbox: Lima Ubuntu 24.04 VM on Apple Silicon macOS.
 - Docker is acceptable for development smoke tests only, not for the official demo.
 
-The current parser is deterministic for v0.1 stability. If wiring in LLM-based parsing, keep the deterministic policy and tool authorization boundary intact.
-
-## Roadmap Status
-
-| Area | Status |
-| --- | --- |
-| Pydantic + LangGraph control loop | implemented |
-| Exact typed confirmation | implemented |
-| Mandatory verification | implemented |
-| Persistent JSONL audit logs | implemented |
-| Seven-scenario demo spine | implemented |
-| Safe cleanup | implemented with limitations: approved demo/temp candidates only |
-| Live VM rehearsal | implemented with limitations: opt-in smoke test, not default |
-| SSH/web/voice/persistent memory/multi-agent orchestration | future |
+The parser is deterministic for stability. If wiring in LLM-based parsing, keep
+the deterministic policy, schema, approval, redaction, and tool authorization
+boundaries intact.
 
 ## Development Workflow
 
@@ -164,7 +170,7 @@ When changing behavior:
 4. Run `uv run ruff check .`.
 5. Run `uv run ruff format --check .`.
 6. Run `uv run ty check`.
-7. Update docs if the user-facing behavior, tool surface, safety model, or demo flow changed.
+7. Update docs if the user-facing behavior, capability surface, safety model, schema contract, or demo flow changed.
 
 Avoid unrelated refactors. This project is intentionally small and audit-friendly.
 
@@ -174,14 +180,13 @@ The judge-facing story is:
 
 ```text
 Natural language request
-→ explicit execution plan
-→ environment-aware policy decision
-→ typed confirmation when needed
-→ bounded tool execution
-→ verification
-→ state update
-→ audit trace
-→ clear natural-language response
+-> explicit execution plan
+-> reference and schema validation
+-> environment-aware policy decision
+-> approval-bound typed confirmation when needed
+-> controlled adapter execution
+-> output normalization and redaction
+-> verification
+-> authoritative audit trace
+-> clear audit-derived response
 ```
-
-The strongest v0.1 demo is the disk-pressure workflow: detect disk pressure, propose safe cleanup, explain why the candidates are safe in this environment, request confirmation, execute bounded cleanup, verify the result, and suggest preventive monitoring.

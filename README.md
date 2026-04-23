@@ -1,13 +1,14 @@
 # XFusion Guardian
 
-XFusion Guardian is a v0.1 safety-aware Linux administration agent for the AI
+XFusion Guardian is a v0.2 capability-governed Linux administration agent for the AI
 Hackathon 2026 preliminary problem: an operating-system intelligent agent that
 can manage a real Linux server through natural language.
 
-The project is demo-first and safety-first. It uses an explicit execution plan,
-deterministic policy checks, typed confirmation gates, mandatory verification,
-short-lived memory, and JSONL audit records so Linux admin workflows are
-explainable, bounded, and testable.
+The project is demo-first and safety-first. It uses typed capability proposals,
+explicit execution plans, deterministic policy checks, approval gates,
+controlled adapters, mandatory verification, short-lived memory, redaction, and
+JSONL audit records so Linux admin workflows are explainable, bounded, and
+testable.
 
 ## What It Does
 
@@ -16,14 +17,14 @@ explainable, bounded, and testable.
   verification contracts.
 - Senses environment facts such as distro, current user, sudo availability,
   systemd availability, package manager, disk pressure, and protected paths.
-- Routes only through scoped typed tools, never arbitrary shell passthrough.
-- Requires exact typed confirmation for medium/high-risk actions.
+- Routes only through registered capabilities, never arbitrary shell passthrough.
+- Requires approval-bound exact typed confirmation for mutation capabilities.
 - Refuses forbidden operations on protected paths such as `/`, `/etc`, `/usr`,
   `/boot`, and `/var/lib`.
 - Verifies postconditions after execution instead of trusting tool success.
 - Ships with a YAML verification suite for demo rehearsal and regression tests.
 
-## Current v0.1 Scope
+## Current v0.2 Scope
 
 Supported workflow areas:
 
@@ -43,19 +44,22 @@ Official demo sandbox:
 
 ## Architecture
 
-The implemented v0.1 follows a LangGraph-orchestrated control loop with
+The implemented v0.2 follows a LangGraph-orchestrated control loop with
 Pydantic contracts:
 
 ```text
-Parse
-  -> Disambiguate
-  -> Plan
-  -> Policy
-  -> Confirm
-  -> Execute
-  -> Verify
-  -> Update
-  -> Respond
+agent proposal
+  -> plan schema validation
+  -> dependency/DAG validation
+  -> reference validation/resolution
+  -> capability schema validation
+  -> policy decision
+  -> approval gate
+  -> controlled adapter execution
+  -> output normalization
+  -> redaction
+  -> verification
+  -> explanation
 ```
 
 Important trust boundary:
@@ -63,17 +67,17 @@ Important trust boundary:
 - LLMs may support language understanding, ambiguity detection, plan drafting,
   and response wording.
 - Deterministic Python code owns policy classification, dependency enforcement,
-  confirmation validation, execution authorization, and verification.
+  reference resolution, capability schema validation, approval validation,
+  execution authorization, output redaction, audit state, and verification.
 
 ## Repository Map
 
 - [xfusion/](xfusion/) - Python package and agent implementation
-- [docs/specs/xfusion-v0.1.md](docs/specs/xfusion-v0.1.md) - frozen v0.1 spec
-- [docs/architecture/pydantic-langgraph-blueprint.md](docs/architecture/pydantic-langgraph-blueprint.md) - target architecture blueprint
-- [docs/demo-script.md](docs/demo-script.md) - seven-scenario acceptance demo
-- [docs/sandbox-lima.md](docs/sandbox-lima.md) - Lima sandbox setup
-- [docs/tools.md](docs/tools.md) - tool surface and guarantees
+- [docs/specs/xfusion-v0.2.md](docs/specs/xfusion-v0.2.md) - normative v0.2 spec
+- [docs/architecture/capability-schema.md](docs/architecture/capability-schema.md) - XFusion Capability Schema contract
+- [docs/release-readiness-v0.2.md](docs/release-readiness-v0.2.md) - reviewer notes
 - [docs/verification-suite.md](docs/verification-suite.md) - verification suite design
+- [docs/archive/v0.1/](docs/archive/v0.1/) - historical, non-normative legacy materials
 - [verification/scenarios/](verification/scenarios/) - YAML scenario suite
 - [tests/](tests/) - smoke, safety, workflow, and verification runner tests
 - [AGENTS.md](AGENTS.md) - context guide for future agents and engineers
@@ -145,29 +149,32 @@ default.
 ## Safety Posture
 
 XFusion Guardian is intentionally not a command passthrough proxy. Before any
-tool can run, the agent performs:
+capability can run, the agent performs:
 
 1. ambiguity detection
 2. execution plan construction
-3. dependency enforcement
-4. environment-aware deterministic policy evaluation
-5. exact typed confirmation when required
-6. bounded tool execution
-7. mandatory verification
-8. state update and audit summarization
+3. dependency and reference validation
+4. capability schema validation
+5. environment-aware deterministic policy evaluation
+6. approval validation when required
+7. controlled adapter execution
+8. output normalization and redaction
+9. mandatory verification
+10. state update and audit-derived response generation
 
 This keeps the demo agent agentic enough for multi-step workflows while keeping
 the dangerous decisions inspectable and controllable.
 
 ## Status
 
-v0.1 judge-ready demo spine is implemented and tested. The Pydantic + LangGraph
-architecture blueprint documents the current baseline plus future refinements.
+v0.2 capability-governed execution is implemented and tested. The v0.2 spec is
+the normative source of truth. Legacy materials live only in the historical
+archive and are explicitly non-normative.
 
 | Area | Status |
 | --- | --- |
 | Explicit plan-executing graph | implemented |
-| Deterministic policy and exact confirmation | implemented |
+| Deterministic policy and approval records | implemented |
 | Persistent JSONL audit logs | implemented |
 | Seven acceptance demo scenarios | implemented |
 | Safe cleanup | implemented with limitations: approved demo/temp candidates only |

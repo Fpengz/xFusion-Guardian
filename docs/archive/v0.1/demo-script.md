@@ -1,3 +1,7 @@
+> [!IMPORTANT]
+> Historical, non-normative v0.1 material. For current behavior, use
+> [docs/specs/xfusion-v0.2.md](../../specs/xfusion-v0.2.md).
+
 # XFusion v0.1 Acceptance Demo Script
 
 Record the demo inside the Lima Ubuntu VM.
@@ -125,4 +129,3 @@ Expected:
 - Agent asks typed confirmation.
 - Agent verifies reclaimed/unchanged space.
 - Agent suggests preventive monitoring.
-

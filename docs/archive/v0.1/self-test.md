@@ -1,3 +1,7 @@
+> [!IMPORTANT]
+> Historical, non-normative v0.1 material. For current behavior, use
+> [docs/specs/xfusion-v0.2.md](../../specs/xfusion-v0.2.md).
+
 # XFusion v0.1 Self-Test Checklist
 
 ## Local Development

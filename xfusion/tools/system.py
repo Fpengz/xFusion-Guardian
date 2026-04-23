@@ -46,7 +46,7 @@ class SystemTools:
         elif shutil.which("dnf"):
             state.package_manager = "dnf"
 
-        # Disk pressure (simplified for v0.1)
+        # Coarse environment signal used by policy and cleanup planning.
         res = self.runner.run(["df", "/", "--output=pcent"])
         if res.exit_code == 0:
             try:
@@ -73,7 +73,7 @@ class SystemTools:
         """Report the current effective user."""
         res = self.runner.run(["id", "-un"])
         user = res.stdout.strip() if res.exit_code == 0 else os.environ.get("USER", "unknown")
-        return ToolOutput(summary=f"Current user: {user}", data={"user": user})
+        return ToolOutput(summary=f"Current user: {user}", data={"username": user})
 
     def check_sudo(self) -> ToolOutput:
         """Report whether passwordless sudo is currently available."""

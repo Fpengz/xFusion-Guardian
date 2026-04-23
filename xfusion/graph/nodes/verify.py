@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from xfusion.domain.enums import StepStatus
+from xfusion.domain.enums import FailureClass, StepStatus
 from xfusion.domain.models.verification import VerificationResult
 from xfusion.graph.state import AgentGraphState
 
@@ -141,7 +141,7 @@ def verify_node(state: AgentGraphState) -> AgentGraphState:
     success, summary = _dispatch_verification(
         step.verification_method,
         step.success_condition,
-        step.parameters,
+        step.normalized_args or step.args,
         tool_output,
     )
 
@@ -157,6 +157,13 @@ def verify_node(state: AgentGraphState) -> AgentGraphState:
         step.status = StepStatus.SUCCESS
     else:
         step.status = StepStatus.FAILED
+        step.failure_class = FailureClass.VERIFICATION_FAILURE.value
+        step.failure_details = {
+            "failure_class": FailureClass.VERIFICATION_FAILURE.value,
+            "method": step.verification_method,
+            "summary": summary,
+            "details": tool_output,
+        }
         state.response = f"Verification failed: {summary}"
 
     return state
