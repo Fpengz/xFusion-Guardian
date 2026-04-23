@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.2.4.1 - 2026-04-24
+
+- Added deterministic per-step command trace capture to the execution pipeline
+  with planned argv, executed argv, exit code, bounded output excerpts, and
+  timing metadata.
+- Exposed command trace through tool registry/runtime flow and attached it to
+  authoritative step/audit records as execution metadata, without changing
+  capability input/output schema contracts.
+- Redesigned normal-mode user responses for completed read-only steps to show a
+  command-transparent transcript (`About to run`, `Ran`, `Output`, `What this
+  means`) while keeping debug mode as the full internal metadata view.
+- Updated response and command-trace tests to validate the new normal-mode
+  contract, debug separation, and trace recording behavior for single/multi
+  command tool paths.
+
 ## v0.2.4 - 2026-04-24
 
 - Added normalized machine-readable policy outputs and reason codes:

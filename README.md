@@ -184,7 +184,7 @@ the dangerous decisions inspectable and controllable.
 ## Status
 
 v0.2 capability-governed execution is implemented and tested. The current
-shipping increment is `v0.2.4`, which keeps the v0.2 architecture authoritative
+shipping increment is `v0.2.4.1`, which keeps the v0.2 architecture authoritative
 while adding policy decision normalization, explicit high-risk admin
 confirmation semantics, and execute-time policy integrity binding on registered
 capabilities. The v0.2 spec remains the normative source of truth.
