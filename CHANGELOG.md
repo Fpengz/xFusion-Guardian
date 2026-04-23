@@ -5,9 +5,9 @@
 - Expanded deterministic verification-repair hardening with explicit
   equivalence/reapproval behavior and stricter fail-closed tests for escalation,
   non-equivalence, and inconclusive outcomes.
-- Tightened practical runtime/containment guardrails in the controlled execution
-  path and verification dispatch mappings used for bounded filesystem-style
-  operations.
+- Clarified runtime containment boundary expectations (deterministic guardrails,
+  not OS sandboxing) and hardened verification dispatch mappings used for
+  bounded filesystem-style operations.
 - Expanded verification and regression coverage across repair, role-boundary,
   and workflow invariants with canonical `step_id`/`args` contracts.
 - Completed hygiene sweep for reviewer clarity: fixed archive broken links,

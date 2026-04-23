@@ -9,8 +9,8 @@ hardening pass. Normative behavior remains
 - Strengthens deterministic repair/equivalence handling without opening a new
   policy or execution architecture track.
 - Keeps repair lineage and re-entry semantics explicit and auditable.
-- Tightens practical containment/verification guardrails in runtime-facing
-  paths where feasible in the current repo model.
+- Clarifies practical containment boundaries in runtime-facing paths and
+  hardens verification guardrails where feasible in the current repo model.
 - Expands high-value regression and hardening tests while keeping fail-closed
   behavior explicit.
 - Cleans reviewer-facing hygiene and historical references so current authority

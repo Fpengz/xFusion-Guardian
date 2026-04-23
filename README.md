@@ -182,8 +182,9 @@ the dangerous decisions inspectable and controllable.
 
 v0.2 capability-governed execution is implemented and tested. The current
 hardening baseline is `v0.2.2`, which keeps the v0.2 architecture authoritative
-while tightening repair/equivalence handling, containment guardrails, and
-verification corpus depth. The v0.2 spec remains the normative source of truth.
+while tightening repair/equivalence handling, clarifying containment guardrail
+boundaries, and increasing verification corpus depth. The v0.2 spec remains the
+normative source of truth.
 Legacy materials live only in the historical archive and are explicitly
 non-normative.
 

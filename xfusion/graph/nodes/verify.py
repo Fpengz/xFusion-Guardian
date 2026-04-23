@@ -395,7 +395,7 @@ def verify_node(state: AgentGraphState) -> AgentGraphState:
         step.failure_class = FailureClass.VERIFICATION_FAILURE.value
         step.failure_details = {
             "failure_class": FailureClass.VERIFICATION_FAILURE.value,
-            "method": step.verification_method,
+            "method": v_method,
             "summary": summary,
             "details": tool_output,
         }

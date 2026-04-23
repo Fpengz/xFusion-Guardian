@@ -172,7 +172,6 @@ def test_target_change_after_failed_verification_invalidates_reused_approval() -
 
     repair_step.status = StepStatus.PENDING
     repair_step.args = {"pid": 9999, "signal": "KILL"}
-    repair_step.args = {"pid": 9999, "signal": "KILL"}
     state["plan"].interaction_state = InteractionState.EXECUTING
     state["plan"].status = "executing"
 
@@ -207,6 +206,31 @@ def test_inconclusive_verification_is_never_promoted_to_success() -> None:
     assert state["verification_result"].success is False
     assert state["verification_result"].outcome == VerificationStatus.INCONCLUSIVE
     assert state["plan"].interaction_state == InteractionState.FAILED
+
+
+def test_failure_details_record_inferred_verification_method() -> None:
+    plan = ExecutionPlan(
+        plan_id="inferred-method-audit",
+        goal="verify free port",
+        language="en",
+        steps=[
+            PlanStep(
+                step_id="verify_port",
+                capability="process.find_by_port",
+                args={"port": 8080, "expect_free": True},
+                expected_outputs={"pids": "array"},
+                justification="Verify the port is free.",
+                on_failure="stop",
+            )
+        ],
+    )
+    graph = build_agent_graph(OutputRegistry({"process.find_by_port": {"pids": [1234]}})).compile()
+
+    state = graph.invoke(_state(plan, user_input="verify port"))
+    failed_step = state["plan"].steps[0]
+
+    assert state["verification_result"].method == "port_process_recheck"
+    assert failed_step.failure_details["method"] == "port_process_recheck"
 
 
 def test_role_boundary_runtime_record_rejects_observation_mutation_and_is_auditable() -> None:

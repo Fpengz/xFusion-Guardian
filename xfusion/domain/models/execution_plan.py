@@ -10,9 +10,9 @@ class PlanStep(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    step_id: str = Field(default="", min_length=0)
+    step_id: str = Field(min_length=1)
     intent: str = Field(default="", min_length=0)
-    capability: str = Field(default="", min_length=0)
+    capability: str = Field(min_length=1)
     args: dict[str, object] = Field(default_factory=dict)
     depends_on: list[str] = Field(default_factory=list)
     expected_outputs: dict[str, object] = Field(default_factory=dict)

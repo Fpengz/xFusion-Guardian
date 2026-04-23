@@ -67,6 +67,28 @@ def test_plan_step_accepts_v02_capability_args() -> None:
     assert step.args == {"path": "/"}
 
 
+def test_plan_step_requires_non_empty_step_id() -> None:
+    with pytest.raises(ValidationError, match="at least 1 character"):
+        PlanStep.model_validate(
+            {
+                "step_id": "",
+                "capability": "disk.check_usage",
+                "args": {"path": "/"},
+            }
+        )
+
+
+def test_plan_step_requires_non_empty_capability() -> None:
+    with pytest.raises(ValidationError, match="at least 1 character"):
+        PlanStep.model_validate(
+            {
+                "step_id": "check_disk",
+                "capability": "",
+                "args": {"path": "/"},
+            }
+        )
+
+
 def test_plan_step_rejects_unknown_extra_fields() -> None:
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         PlanStep.model_validate(

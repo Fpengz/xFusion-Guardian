@@ -100,6 +100,19 @@ def run_static_scenario(
         )
         decisive = decisive or decisions[0]
 
+        for step, decision in zip(state.plan.steps, decisions, strict=True):
+            step.risk_level = decision.risk_level
+            step.requires_confirmation = decision.requires_approval
+
+        if decisive.risk_level.value != expected.risk_level:
+            errors.append(f"Expected risk {expected.risk_level}, got {decisive.risk_level.value}")
+
+        if decisive.requires_approval != expected.requires_confirmation:
+            errors.append(
+                f"Expected requires_confirmation {expected.requires_confirmation}, "
+                f"got {decisive.requires_approval}"
+            )
+
         if decisive.is_denied:
             state.plan.interaction_state = InteractionState.REFUSED
             state.plan.status = "refused"
