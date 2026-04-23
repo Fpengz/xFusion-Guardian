@@ -77,34 +77,55 @@ class FakeRunner(CommandRunner):
 
 def test_plan_step_rejects_conflicting_v02_and_legacy_execution_surfaces() -> None:
     with pytest.raises(ValidationError, match="Conflicting capability/tool"):
-        PlanStep(
-            id="confused",
-            capability="process.kill",
-            tool="system.current_user",
-            args={"pid": 1234, "signal": "TERM"},
-            parameters={},
-            expected_outputs={"ok": "boolean"},
-            justification="Conflicting surfaces must fail closed.",
-            verification_method="command_exit_status_plus_state",
-            success_condition="Process stopped.",
-            failure_condition="Process still running.",
-            fallback_action="stop",
+        PlanStep.model_validate(
+            {
+                "id": "confused",
+                "capability": "process.kill",
+                "tool": "system.current_user",
+                "args": {"pid": 1234, "signal": "TERM"},
+                "parameters": {},
+                "expected_outputs": {"ok": "boolean"},
+                "justification": "Conflicting surfaces must fail closed.",
+                "verification_method": "command_exit_status_plus_state",
+                "success_condition": "Process stopped.",
+                "failure_condition": "Process still running.",
+                "fallback_action": "stop",
+            }
         )
 
 
 def test_plan_step_rejects_conflicting_v02_and_legacy_argument_surfaces() -> None:
     with pytest.raises(ValidationError, match="Conflicting args/parameters"):
-        PlanStep(
-            id="confused",
-            capability="process.kill",
-            args={"pid": 1234, "signal": "TERM"},
-            parameters={"pid": 9999, "signal": "TERM"},
-            expected_outputs={"ok": "boolean"},
-            justification="Conflicting arguments must fail closed.",
-            verification_method="command_exit_status_plus_state",
-            success_condition="Process stopped.",
-            failure_condition="Process still running.",
-            fallback_action="stop",
+        PlanStep.model_validate(
+            {
+                "id": "confused",
+                "capability": "process.kill",
+                "args": {"pid": 1234, "signal": "TERM"},
+                "parameters": {"pid": 9999, "signal": "TERM"},
+                "expected_outputs": {"ok": "boolean"},
+                "justification": "Conflicting arguments must fail closed.",
+                "verification_method": "command_exit_status_plus_state",
+                "success_condition": "Process stopped.",
+                "failure_condition": "Process still running.",
+                "fallback_action": "stop",
+            }
+        )
+
+
+def test_plan_step_rejects_legacy_only_execution_surface() -> None:
+    with pytest.raises(ValidationError, match="Legacy tool field without canonical capability"):
+        PlanStep.model_validate(
+            {
+                "id": "legacy-only",
+                "tool": "process.kill",
+                "parameters": {"pid": 1234, "signal": "TERM"},
+                "expected_outputs": {"ok": "boolean"},
+                "justification": "Legacy-only execution surface is forbidden.",
+                "verification_method": "command_exit_status_plus_state",
+                "success_condition": "Process stopped.",
+                "failure_condition": "Process still running.",
+                "fallback_action": "stop",
+            }
         )
 
 
@@ -168,6 +189,30 @@ def test_legacy_ref_dict_is_rejected_by_static_validation_and_resolver() -> None
         )
 
 
+def test_reference_resolution_requires_authorized_outputs_mapping() -> None:
+    plan = ExecutionPlan(
+        plan_id="missing-authorized-outputs",
+        goal="resolve references",
+        language="en",
+        steps=[
+            PlanStep(
+                id="find",
+                capability="process.find_by_port",
+                args={"port": 8080},
+                expected_outputs={"pids": "array"},
+                justification="Find process.",
+                verification_method="port_process_recheck",
+                success_condition="Port state is reported.",
+                failure_condition="Port lookup fails.",
+                fallback_action="stop",
+            )
+        ],
+    )
+
+    with pytest.raises(ValueError, match="authorized_outputs is required"):
+        resolve_args(plan.steps[0].args, plan=plan)
+
+
 def test_registered_capability_schemas_are_closed_objects() -> None:
     registry = build_default_capability_registry()
 
@@ -229,6 +274,18 @@ def test_policy_denies_tier0_when_target_scope_is_not_explicit() -> None:
     assert decision.decision == PolicyDecisionValue.DENY
     assert decision.matched_rule_id == "scope.explicit_required"
     assert "deny_by_default" in decision.reason_codes
+
+
+def test_policy_denies_missing_canonical_invocation_contract() -> None:
+    decision = evaluate_policy(
+        capability_name=None,
+        resolved_args=None,
+        environment=EnvironmentState(),
+    )
+
+    assert decision.decision == PolicyDecisionValue.DENY
+    assert decision.matched_rule_id == "default.invalid_invocation_contract"
+    assert "invalid_policy_invocation" in decision.reason_codes
 
 
 def test_runtime_normalizes_and_redacts_adapter_exceptions() -> None:

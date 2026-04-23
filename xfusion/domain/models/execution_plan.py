@@ -43,6 +43,10 @@ class PlanStep(BaseModel):
     failure_class: str | None = None
     failure_details: dict[str, object] = Field(default_factory=dict)
     redaction_metadata: dict[str, object] = Field(default_factory=dict)
+    started_at: str | None = None
+    ended_at: str | None = None
+    repair_of_step_id: str | None = None
+    repair_proposal_id: str | None = None
     expected_output: str = Field(default="Structured capability output.", min_length=1)
     verification_method: str = Field(min_length=1)
     success_condition: str = Field(min_length=1)
@@ -58,6 +62,12 @@ class PlanStep(BaseModel):
             return data
 
         normalized = dict(data)
+        if "tool" in normalized and "capability" not in normalized:
+            raise ValueError("Legacy tool field without canonical capability is forbidden.")
+        if "parameters" in normalized and "args" not in normalized:
+            raise ValueError("Legacy parameters field without canonical args is forbidden.")
+        if "dependencies" in normalized and "depends_on" not in normalized:
+            raise ValueError("Legacy dependencies field without canonical depends_on is forbidden.")
         if (
             normalized.get("capability") is not None
             and normalized.get("tool") is not None
@@ -84,18 +94,12 @@ class PlanStep(BaseModel):
 
         if normalized.get("tool") is None and normalized.get("capability") is not None:
             normalized["tool"] = normalized["capability"]
-        if normalized.get("capability") is None and normalized.get("tool") is not None:
-            normalized["capability"] = normalized["tool"]
 
         if "parameters" not in normalized and "args" in normalized:
             normalized["parameters"] = normalized["args"]
-        if "args" not in normalized and "parameters" in normalized:
-            normalized["args"] = normalized["parameters"]
 
         if "dependencies" not in normalized and "depends_on" in normalized:
             normalized["dependencies"] = normalized["depends_on"]
-        if "depends_on" not in normalized and "dependencies" in normalized:
-            normalized["depends_on"] = normalized["dependencies"]
 
         if not normalized.get("intent"):
             normalized["intent"] = (

@@ -9,6 +9,17 @@ from xfusion.graph.state import AgentGraphState
 from xfusion.security.redaction import redact_value
 
 
+def _safe_redact(value: object) -> tuple[object, dict[str, object]]:
+    try:
+        redacted, meta = redact_value(value)
+        return redacted, dict(meta)
+    except Exception:  # noqa: BLE001 - auditing must fail closed without raw exposure.
+        return (
+            {"error": "redaction_failed_raw_value_withheld"},
+            {"redacted": True, "counts": {}, "redaction_failed": True},
+        )
+
+
 def log_graph_event(
     state: AgentGraphState,
     *,
@@ -32,6 +43,8 @@ def log_graph_event(
                 "normalized_args": step.normalized_args or step.args,
                 "argument_provenance": step.argument_provenance,
                 "resolved_references": step.resolved_references,
+                "repair_of_step_id": step.repair_of_step_id,
+                "repair_proposal_id": step.repair_proposal_id,
                 "output": state.step_outputs.get(step.step_id, {}),
             }
         )
@@ -45,25 +58,32 @@ def log_graph_event(
         state.verification_result.model_dump() if state.verification_result else {}
     )
 
-    original_user_request, request_redaction = redact_value(state.user_input)
-    interpreted_intent, intent_redaction = redact_value(state.plan.goal)
-    role_proposals, role_redaction = redact_value(
+    original_user_request, request_redaction = _safe_redact(state.user_input)
+    interpreted_intent, intent_redaction = _safe_redact(state.plan.goal)
+    role_contracts, role_contracts_redaction = _safe_redact(
         {key: contract.model_dump() for key, contract in state.role_contracts.items()}
     )
-    plan_draft, plan_redaction = redact_value(state.plan.model_dump(mode="json"))
-    normalized_args, args_redaction = redact_value(step.normalized_args or step.args)
-    summary_value, summary_redaction = redact_value(summary)
-    redacted_action, action_redaction = redact_value(action)
-    redacted_verification, verification_redaction = redact_value(verification)
+    role_runtime_records, role_runtime_redaction = _safe_redact(
+        [record.model_dump(mode="json") for record in state.role_runtime_records]
+    )
+    repair_proposals, repair_redaction = _safe_redact(
+        [proposal.model_dump(mode="json") for proposal in state.repair_proposals]
+    )
+    plan_draft, plan_redaction = _safe_redact(state.plan.model_dump(mode="json"))
+    normalized_args, args_redaction = _safe_redact(step.normalized_args or step.args)
+    summary_value, summary_redaction = _safe_redact(summary)
+    redacted_action, action_redaction = _safe_redact(action)
+    redacted_verification, verification_redaction = _safe_redact(verification)
     normalized_output = state.step_outputs.get(step.step_id, {})
-    redacted_output, output_redaction = redact_value(normalized_output)
+    redacted_output, output_redaction = _safe_redact(normalized_output)
 
     record = {
         "timestamp": datetime.now().isoformat(),
         "plan_id": state.plan.plan_id,
         "original_user_request": original_user_request,
         "interpreted_intent": interpreted_intent,
-        "role_proposals": role_proposals,
+        "role_contracts": role_contracts,
+        "role_runtime_records": role_runtime_records,
         "plan_draft": plan_draft,
         "validation_result": state.validation_result.model_dump(mode="json")
         if state.validation_result
@@ -73,16 +93,21 @@ def log_graph_event(
         "normalized_args": normalized_args,
         "argument_provenance": step.argument_provenance,
         "resolved_references": step.resolved_references,
+        "repair_of_step_id": step.repair_of_step_id,
+        "repair_proposal_id": step.repair_proposal_id,
         "matched_policy_rule": step.policy_rule_id,
         "approval_mode": step.approval_mode,
         "approval_id": step.approval_id,
         "action_fingerprint": step.action_fingerprint,
         "adapter_id": step.adapter_id,
+        "step_started_at": step.started_at,
+        "step_ended_at": step.ended_at,
         "interaction_state": state.plan.interaction_state,
         "before_state": before_state,
         "action_taken": redacted_action,
         "after_state": after_state,
         "verification_result": redacted_verification,
+        "repair_proposals": repair_proposals,
         "normalized_output": redacted_output,
         "redaction_metadata": {
             "action": action_redaction,
@@ -90,11 +115,13 @@ def log_graph_event(
             "output": output_redaction,
             "original_user_request": request_redaction,
             "interpreted_intent": intent_redaction,
-            "role_proposals": role_redaction,
+            "role_contracts": role_contracts_redaction,
+            "role_runtime_records": role_runtime_redaction,
             "plan_draft": plan_redaction,
             "normalized_args": args_redaction,
             "summary": summary_redaction,
             "step": step.redaction_metadata,
+            "repair_proposals": repair_redaction,
         },
         "status": status,
         "summary": summary_value,
@@ -102,14 +129,28 @@ def log_graph_event(
     state.audit_records.append(record)
 
     if state.audit_log_path:
+        started = datetime.fromisoformat(step.started_at) if step.started_at else None
+        ended = datetime.fromisoformat(step.ended_at) if step.ended_at else None
+        action_for_log: dict[str, object]
+        verification_for_log: dict[str, object]
+        if isinstance(redacted_action, dict):
+            action_for_log = {str(key): value for key, value in redacted_action.items()}
+        else:
+            action_for_log = {"value": redacted_action}
+        if isinstance(redacted_verification, dict):
+            verification_for_log = {str(key): value for key, value in redacted_verification.items()}
+        else:
+            verification_for_log = {"value": redacted_verification}
         AuditLogger(JsonlAuditSink(state.audit_log_path)).log_step(
             plan_id=state.plan.plan_id,
             step_id=step.step_id,
             interaction_state=str(state.plan.interaction_state),
             before_state=before_state,
-            action_taken=redacted_action,
+            action_taken=action_for_log,
             after_state=after_state,
-            verification_result=redacted_verification,
+            verification_result=verification_for_log,
+            step_started_at=started,
+            step_ended_at=ended,
             status=status,
             summary=str(summary_value),
         )

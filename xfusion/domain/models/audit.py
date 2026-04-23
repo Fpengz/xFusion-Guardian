@@ -18,5 +18,7 @@ class AuditRecord(BaseModel):
     action_taken: dict[str, object]
     after_state: dict[str, object]
     verification_result: dict[str, object]
+    step_started_at: datetime | None = None
+    step_ended_at: datetime | None = None
     status: str = Field(min_length=1)
     summary: str = Field(min_length=1)

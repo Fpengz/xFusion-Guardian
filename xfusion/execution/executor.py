@@ -7,4 +7,4 @@ from xfusion.tools.registry import ToolRegistry
 
 def execute_step(step: PlanStep, registry: ToolRegistry) -> ToolOutput:
     """Execute exactly one planned step using the tool registry."""
-    return registry.execute(step.tool, step.parameters)
+    return registry.execute(str(step.capability), step.args)

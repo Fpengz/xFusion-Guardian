@@ -46,7 +46,7 @@ def _compare_common_expectations(
     if len(plan.steps) != expected.plan_length:
         errors.append(f"Expected plan length {expected.plan_length}, got {len(plan.steps)}")
 
-    plan_tools = [step.tool for step in plan.steps]
+    plan_tools = [step.capability for step in plan.steps]
     if plan_tools != expected.plan_tools:
         errors.append(f"Expected plan tools {expected.plan_tools}, got {plan_tools}")
 
@@ -87,7 +87,10 @@ def run_static_scenario(
     elif state.plan.steps:
         decisions = [
             evaluate_policy(
-                tool=step.tool, parameters=step.parameters, environment=state.environment
+                capability_name=step.capability,
+                resolved_args=step.args,
+                argument_provenance={key: "literal_or_validated_user_input" for key in step.args},
+                environment=state.environment,
             )
             for step in state.plan.steps
         ]

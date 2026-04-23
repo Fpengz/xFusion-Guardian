@@ -21,6 +21,8 @@ class AuditLogger:
         action_taken: dict[str, object],
         after_state: dict[str, object],
         verification_result: dict[str, object],
+        step_started_at: datetime | None,
+        step_ended_at: datetime | None,
         status: str,
         summary: str,
     ) -> None:
@@ -34,6 +36,8 @@ class AuditLogger:
             action_taken=action_taken,
             after_state=after_state,
             verification_result=verification_result,
+            step_started_at=step_started_at,
+            step_ended_at=step_ended_at,
             status=status,
             summary=summary,
         )

@@ -118,6 +118,8 @@ def test_audit_logger_writes_required_schema(tmp_path) -> None:
         action_taken={"tool": "disk.check_usage"},
         after_state={"after": True},
         verification_result={"success": True},
+        step_started_at=None,
+        step_ended_at=None,
         status="success",
         summary="ok",
     )

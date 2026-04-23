@@ -113,10 +113,12 @@ def resolve_args(
     authorized_outputs: dict[str, dict[str, Any]] | None = None,
     step_outputs: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, object]:
-    # ``step_outputs`` is accepted only for old tests; v0.2 callers must pass
-    # accepted authorized outputs.
-    outputs = authorized_outputs if authorized_outputs is not None else step_outputs or {}
+    if authorized_outputs is None:
+        raise ValueError(
+            "authorized_outputs is required for v0.2 reference resolution; "
+            "legacy step_outputs fallback is forbidden."
+        )
     return {
-        key: resolve_value(value, plan=plan, authorized_outputs=outputs)
+        key: resolve_value(value, plan=plan, authorized_outputs=authorized_outputs)
         for key, value in args.items()
     }

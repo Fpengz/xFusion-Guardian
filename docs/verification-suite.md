@@ -102,6 +102,10 @@ expected:
   refusal_or_fallback: ""
 ```
 
+## v0.2 Verification Dataset Strategy
+
+For the definitive guide on designing, evaluating, and evolving the v0.2 verification dataset, see [verification-dataset-strategy.md](verification-dataset-strategy.md). This strategy shifts the focus from simple intent classification to authoritative pipeline state transitions and audit-backed truth.
+
 ## Run
 
 ```bash

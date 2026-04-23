@@ -28,7 +28,7 @@ def main() -> None:
 
     graph = build_agent_graph(registry).compile()
 
-    print("XFusion Guardian v0.2")
+    print("XFusion Guardian v0.2.1")
     print("Capability-governed Linux Administration Agent")
     print("-" * 40)
 

@@ -147,8 +147,8 @@ def test_reference_resolution_error_missing_step():
             PlanStep(
                 step_id="step1",
                 intent="intent1",
-                tool="system.detect_os",
-                parameters={"target": {"ref": "nonexistent_step.data"}},
+                capability="system.detect_os",
+                args={"target": {"ref": "nonexistent_step.data"}},
                 expected_output="ok",
                 verification_method="tool_success",
                 success_condition="ok",

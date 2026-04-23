@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from xfusion.capabilities.registry import build_default_capability_registry
-from xfusion.domain.enums import InteractionState, StepStatus
+from xfusion.domain.enums import InteractionState, PolicyDecisionValue, StepStatus
 from xfusion.execution.runtime import ControlledAdapterRuntime
 from xfusion.graph.state import AgentGraphState
 from xfusion.planning.reference_resolver import resolve_args
@@ -10,6 +10,7 @@ from xfusion.policy.approval import (
     build_referenced_output_fingerprints,
     validate_approval_for_invocation,
 )
+from xfusion.policy.rules import evaluate_policy
 
 
 def execute_node(state: AgentGraphState, registry=None) -> AgentGraphState:
@@ -98,6 +99,36 @@ def execute_node(state: AgentGraphState, registry=None) -> AgentGraphState:
             state.response = f"Approval invalidated before execution: {reason}"
             return state
 
+        policy_recheck = evaluate_policy(
+            capability_name=str(step.capability),
+            resolved_args=resolved_params,
+            argument_provenance=build_argument_provenance(step.args),
+            environment=state.environment,
+            actor_type="assistant",
+            host_class="production",
+            target_scope="explicit",
+            request_intent=state.plan.intent_class,
+            prior_approval_state={
+                approval_id: record.model_dump(mode="json")
+                for approval_id, record in state.approval_records.items()
+            },
+        )
+        if policy_recheck.decision != PolicyDecisionValue.REQUIRE_APPROVAL:
+            step.status = StepStatus.FAILED
+            step.failure_class = "approval_invalidated"
+            step.failure_details = {
+                "failure_class": "approval_invalidated",
+                "reason": "policy_decision_changed",
+                "approval_id": approval.approval_id,
+                "capability": step.capability,
+                "normalized_args": resolved_params,
+                "policy_decision": policy_recheck.model_dump(),
+            }
+            state.response = (
+                "Approval invalidated before execution: policy decision changed after approval."
+            )
+            return state
+
     outcome = ControlledAdapterRuntime(registry).execute(
         capability=capability,
         normalized_args=resolved_params,
@@ -106,6 +137,8 @@ def execute_node(state: AgentGraphState, registry=None) -> AgentGraphState:
     step.normalized_args = resolved_params
     step.adapter_id = capability.adapter_id
     step.redaction_metadata = outcome.redaction_metadata
+    step.started_at = outcome.invocation.started_at.isoformat()
+    step.ended_at = outcome.ended_at.isoformat()
 
     if outcome.status != "succeeded" or "error" in outcome.normalized_output:
         step.status = StepStatus.FAILED

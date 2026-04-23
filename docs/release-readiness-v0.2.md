@@ -10,6 +10,9 @@ normative behavior remains [docs/specs/xfusion-v0.2.md](specs/xfusion-v0.2.md).
 - Static validation rejects unknown capabilities, conflicting legacy fields,
   invalid dependencies, fabricated references, unknown args, and schema
   mismatches before policy or execution.
+- Legacy-only invocation fields are fail-closed: `tool`, `parameters`, and
+  `dependencies` cannot be used without canonical `capability`, `args`, and
+  `depends_on`.
 - Policy, approval, runtime constraints, output normalization, redaction,
   verification, and audit records form the deterministic authority path.
 - Adapter outputs are centrally schema-validated before they can be audited as

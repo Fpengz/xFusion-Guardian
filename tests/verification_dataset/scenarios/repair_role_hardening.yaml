@@ -1,0 +1,207 @@
+- case_id: failed_verification_typed_repair_001
+  title: Failed verification yields typed repair proposal and lineage
+  category: scenario
+  tags: [verification, repair, audit]
+  input:
+    user_request: Verify port 8080 is free
+    actor_type: operator
+    environment: production
+    host_class: app_server
+  context:
+    capabilities_available: [process.find_by_port]
+    prior_approvals: []
+    fixtures:
+      port_8080_pids: [1234]
+  expected:
+    planning:
+      valid: true
+      required_capabilities: [process.find_by_port]
+    policy:
+      process.find_by_port:
+        decision: allow
+        risk_tier: 0
+    approval:
+      required: false
+      invalidates_on: []
+    execution:
+      status: repair_proposed
+    verification:
+      outcome: failed
+    audit_assertions:
+      must_include: [verification_result, repair_proposals, role_runtime_records]
+    explanation_assertions:
+      must_state:
+        - "typed repair proposed"
+
+- case_id: repair_revalidation_reapproval_001
+  title: Materially changed repair re-enters and requires reapproval
+  category: invariant
+  tags: [repair, approval, reentry]
+  input:
+    user_request: Stop PID 1234 with TERM
+    actor_type: operator
+    environment: production
+    host_class: app_server
+  context:
+    capabilities_available: [process.kill]
+    prior_approvals: []
+    fixtures:
+      initial_signal: TERM
+      escalated_signal: KILL
+  expected:
+    planning:
+      valid: true
+      required_capabilities: [process.kill]
+    policy:
+      process.kill:
+        decision: require_approval
+        risk_tier: 1
+    approval:
+      required: true
+      invalidates_on: [material_change, risk_increase]
+    execution:
+      status: blocked_until_reapproval
+    verification:
+      outcome: failed
+    audit_assertions:
+      must_include: [repair_proposals, approval_requested]
+    explanation_assertions:
+      must_state:
+        - "queued for deterministic re-entry"
+
+- case_id: term_kill_escalation_001
+  title: TERM to KILL escalation is explicit and non-equivalent
+  category: fault_injection
+  tags: [repair, escalation, term-kill]
+  input:
+    user_request: Force stop process
+    actor_type: operator
+    environment: production
+    host_class: app_server
+  context:
+    capabilities_available: [process.kill]
+    prior_approvals: []
+    fixtures:
+      verification_failure: true
+  expected:
+    planning:
+      valid: true
+      required_capabilities: [process.kill]
+    policy:
+      process.kill:
+        decision: require_approval
+        risk_tier: 1
+    approval:
+      required: true
+      invalidates_on: [material_change]
+    execution:
+      status: awaiting_confirmation
+    verification:
+      outcome: failed
+    audit_assertions:
+      must_include: [repair_proposals, approval_requested]
+    explanation_assertions:
+      must_state:
+        - "deterministic re-entry"
+
+- case_id: target_change_invalidates_approval_001
+  title: Target change after failed verification invalidates prior approval
+  category: adversarial
+  tags: [repair, approval, target-change]
+  input:
+    user_request: Stop PID then retry
+    actor_type: operator
+    environment: production
+    host_class: app_server
+  context:
+    capabilities_available: [process.kill]
+    prior_approvals: [approved]
+    fixtures:
+      original_pid: 1234
+      changed_pid: 9999
+  expected:
+    planning:
+      valid: true
+      required_capabilities: [process.kill]
+    policy:
+      process.kill:
+        decision: require_approval
+        risk_tier: 1
+    approval:
+      required: true
+      invalidates_on: [target_change]
+    execution:
+      status: approval_invalidated
+    verification:
+      outcome: failed
+    audit_assertions:
+      must_include: [approval_invalidated, repair_proposals]
+    explanation_assertions:
+      must_state:
+        - "approval invalidated"
+
+- case_id: inconclusive_not_success_001
+  title: Inconclusive verification never counts as success
+  category: invariant
+  tags: [verification, inconclusive]
+  input:
+    user_request: Verify state
+    actor_type: operator
+    environment: production
+    host_class: app_server
+  context:
+    capabilities_available: [system.current_user]
+    prior_approvals: []
+    fixtures:
+      verifier_mode: unknown
+  expected:
+    planning:
+      valid: true
+      required_capabilities: [system.current_user]
+    policy:
+      system.current_user:
+        decision: allow
+        risk_tier: 0
+    approval:
+      required: false
+      invalidates_on: []
+    execution:
+      status: failed
+    verification:
+      outcome: inconclusive
+    audit_assertions:
+      must_include: [verification_result]
+    explanation_assertions:
+      must_state:
+        - "inconclusive"
+
+- case_id: role_boundary_mutation_rejection_001
+  title: Observation mutation proposal is rejected/downgraded and attributable
+  category: adversarial
+  tags: [roles, boundary, provenance]
+  input:
+    user_request: N/A
+    actor_type: assistant
+    environment: production
+    host_class: app_server
+  context:
+    capabilities_available: [process.kill]
+    prior_approvals: []
+    fixtures: {}
+  expected:
+    planning:
+      valid: true
+      required_capabilities: []
+    policy: {}
+    approval:
+      required: false
+      invalidates_on: []
+    execution:
+      status: blocked
+    verification:
+      outcome: unverified
+    audit_assertions:
+      must_include: [role_runtime_records]
+    explanation_assertions:
+      must_state:
+        - "non-authoritative"
