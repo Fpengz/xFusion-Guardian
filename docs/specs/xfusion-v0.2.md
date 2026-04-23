@@ -352,7 +352,7 @@ The policy engine is the sole authority that converts a normalized capability
 invocation into:
 
 - `allow`
-- `require_approval`
+- `require_confirmation`
 - `deny`
 
 Policy inputs include:

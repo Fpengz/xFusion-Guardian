@@ -4,6 +4,7 @@ from datetime import datetime
 
 from xfusion.audit.jsonl_sink import JsonlAuditSink
 from xfusion.audit.logger import AuditLogger
+from xfusion.domain.enums import ApprovalMode
 from xfusion.domain.models.execution_plan import PlanStep
 from xfusion.graph.state import AgentGraphState
 from xfusion.security.redaction import redact_value
@@ -79,6 +80,20 @@ def log_graph_event(
     redacted_verification, verification_redaction = _safe_redact(verification)
     normalized_output = state.step_outputs.get(step.step_id, {})
     redacted_output, output_redaction = _safe_redact(normalized_output)
+    risk_contract, risk_contract_redaction = _safe_redact(step.risk_contract)
+    policy_decision, policy_decision_redaction = _safe_redact(
+        state.policy_decision.model_dump(mode="json") if state.policy_decision else {}
+    )
+    approval = state.approval_records.get(step.approval_id or "")
+    confirmation_required = bool(
+        step.requires_confirmation or step.approval_mode in {ApprovalMode.HUMAN, ApprovalMode.ADMIN}
+    )
+    confirmation_supplied = bool(approval and approval.is_approved)
+    normalized_step = {
+        "step_id": step.step_id,
+        "capability": step.capability,
+        "normalized_args": step.normalized_args or step.args,
+    }
 
     record = {
         "timestamp": datetime.now().isoformat(),
@@ -91,8 +106,20 @@ def log_graph_event(
         "validation_result": state.validation_result.model_dump(mode="json")
         if state.validation_result
         else None,
+        "normalized_step": normalized_step,
         "step_id": step.step_id,
         "capability": step.capability,
+        "risk_classification": risk_contract,
+        "policy_decision": policy_decision,
+        "policy_decision_code": state.policy_decision.decision.value
+        if state.policy_decision
+        else None,
+        "confirmation_type": (
+            state.policy_decision.confirmation_type if state.policy_decision else "none"
+        ),
+        "deny_code": state.policy_decision.deny_code if state.policy_decision else None,
+        "confirmation_required": confirmation_required,
+        "confirmation_supplied": confirmation_supplied,
         "normalized_args": normalized_args,
         "argument_provenance": step.argument_provenance,
         "resolved_references": step.resolved_references,
@@ -112,10 +139,21 @@ def log_graph_event(
         "verification_result": redacted_verification,
         "repair_proposals": repair_proposals,
         "normalized_output": redacted_output,
+        "non_execution_reason": step.failure_class if step.status != "success" else None,
+        "non_execution": (
+            {
+                "code": step.non_execution_code or step.failure_class,
+                "reason_text": step.non_execution_reason_text,
+            }
+            if step.status != "success"
+            else None
+        ),
         "redaction_metadata": {
             "action": action_redaction,
             "verification": verification_redaction,
             "output": output_redaction,
+            "risk_classification": risk_contract_redaction,
+            "policy_decision": policy_decision_redaction,
             "original_user_request": request_redaction,
             "interpreted_intent": intent_redaction,
             "role_contracts": role_contracts_redaction,

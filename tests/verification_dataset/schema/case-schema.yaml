@@ -24,7 +24,7 @@ expected:
 
   policy:
     "<capability_name>":
-      decision: "string" # allow, require_approval, deny
+      decision: "string" # allow, require_confirmation, deny
       risk_tier: number
 
   approval:
