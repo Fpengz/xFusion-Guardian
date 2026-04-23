@@ -100,8 +100,9 @@ def test_jsonl_audit_file_receives_refusal_records(tmp_path) -> None:
     record = json.loads(lines[-1])
     assert record["plan_id"] == state["plan"].plan_id
     assert record["step_id"] == "delete_path"
-    assert record["action_taken"]["tool"] == "cleanup.safe_disk_cleanup"
-    assert record["status"] == "refused"
+    assert record["action_taken"]["capability"] == "cleanup.safe_disk_cleanup"
+    assert record["status"] == "scope_violation"
+    assert record["action_taken"]["failure_class"] == "scope_violation"
     assert "protected" in record["summary"].lower()
 
 

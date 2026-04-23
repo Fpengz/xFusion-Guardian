@@ -80,6 +80,8 @@ def test_smoke_confirmation_flow():
         plan_id="test-plan",
         goal="stop process",
         language="en",
+        verification_strategy="Verify process termination result.",
+        verification_no_meaningful_verifier=True,
         steps=[
             PlanStep(
                 step_id="kill_it",
@@ -101,7 +103,7 @@ def test_smoke_confirmation_flow():
     state = graph.invoke(state)
     assert state["plan"].interaction_state == InteractionState.AWAITING_CONFIRMATION
     phrase = state["pending_confirmation_phrase"]
-    assert phrase == "I understand the risks of Kill the process"
+    assert phrase.startswith("APPROVE ")
 
     # Second turn: user confirms with exact phrase
     state["user_input"] = phrase

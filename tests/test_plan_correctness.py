@@ -13,6 +13,8 @@ class MockRegistry:
 
     def execute(self, name, parameters):
         self.executed_tools.append(name)
+        if name == "process.find_by_port":
+            return self.outputs.get(name, ToolOutput(summary="Found", data={"pids": [1234]}))
         return self.outputs.get(name, ToolOutput(summary="Success", data={"ok": True}))
 
 

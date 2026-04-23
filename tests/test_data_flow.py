@@ -96,17 +96,9 @@ def test_failure_when_no_pid_found():
     # Turn 1: execute find_by_port
     state = graph.invoke(state)
 
-    # It should pause for confirmation of kill step.
-    # Policy is deterministic and does not use tool output to skip the gate.
-    assert state["plan"].interaction_state == InteractionState.AWAITING_CONFIRMATION
-
-    # Turn 2: confirm
-    state["user_input"] = state["pending_confirmation_phrase"]
-    state = graph.invoke(state)
-
-    # Resolution should fail because pids[0] is out of bounds
+    # v0.2 fails closed before approval because pids[0] is not an authorized value.
     assert state["plan"].interaction_state == InteractionState.FAILED
-    assert "Parameter resolution failed" in state["response"]
+    assert "Reference resolution failed" in state["response"]
     assert "list index out of range" in state["response"]
 
 
@@ -183,4 +175,7 @@ def test_reference_resolution_error_missing_step():
 
     state = graph.invoke(state)
     assert state["plan"].interaction_state == InteractionState.FAILED
-    assert "Referenced step 'nonexistent_step' output not found" in state["response"]
+    assert "Plan validation failed" in state["response"]
+    assert any(
+        error.code == "legacy_reference_forbidden" for error in state["validation_result"].errors
+    )
