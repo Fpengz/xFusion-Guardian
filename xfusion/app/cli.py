@@ -28,8 +28,8 @@ def main() -> None:
 
     graph = build_agent_graph(registry).compile()
 
-    print("XFusion Guardian v0.1")
-    print("Safety-aware Linux Administration Agent")
+    print("XFusion Guardian v0.2")
+    print("Capability-governed Linux Administration Agent")
     print("-" * 40)
 
     state: dict[str, object] = {

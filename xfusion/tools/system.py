@@ -46,7 +46,7 @@ class SystemTools:
         elif shutil.which("dnf"):
             state.package_manager = "dnf"
 
-        # Disk pressure (simplified for v0.1)
+        # Coarse environment signal used by policy and cleanup planning.
         res = self.runner.run(["df", "/", "--output=pcent"])
         if res.exit_code == 0:
             try:

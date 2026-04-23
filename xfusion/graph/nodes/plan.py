@@ -9,11 +9,11 @@ from xfusion.graph.state import AgentGraphState
 
 
 def plan_node(state: AgentGraphState) -> AgentGraphState:
-    """Create or revise ExecutionPlan."""
+    """Create a deterministic v0.2 ExecutionPlan draft for known demo workflows."""
     if state.plan:
         return state
 
-    # Deterministic planning for common v0.1 scenarios
+    # Deterministic planning for common bounded scenarios; static validation is authoritative.
     user_input = state.user_input.lower()
 
     steps = []
