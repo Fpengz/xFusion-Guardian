@@ -1,41 +1,15 @@
 from __future__ import annotations
 
-from typing import Any
-
+from xfusion.capabilities.registry import build_default_capability_registry
 from xfusion.domain.enums import InteractionState, StepStatus
+from xfusion.execution.runtime import ControlledAdapterRuntime
 from xfusion.graph.state import AgentGraphState
-
-
-def resolve_parameter(param: Any, step_outputs: dict[str, dict[str, Any]]) -> Any:
-    """Resolve reference parameter like {'ref': 'step_id.key[index]' or 'step_id.key'}."""
-    if not isinstance(param, dict) or "ref" not in param:
-        return param
-
-    ref = str(param["ref"])
-    try:
-        # Format: step_id.key or step_id.key[index]
-        parts = ref.split(".", 1)
-        if len(parts) != 2:
-            raise ValueError(f"Invalid reference format: {ref}")
-
-        step_id, attr = parts
-        if step_id not in step_outputs:
-            raise ValueError(f"Referenced step '{step_id}' output not found.")
-
-        output_data = step_outputs[step_id]
-
-        # Check for index access like pids[0]
-        if "[" in attr and attr.endswith("]"):
-            key, idx_str = attr.rstrip("]").split("[", 1)
-            idx = int(idx_str)
-            val = output_data[key]
-            if not isinstance(val, list):
-                raise ValueError(f"Attribute '{key}' is not a list.")
-            return val[idx]
-        else:
-            return output_data[attr]
-    except (ValueError, KeyError, IndexError) as e:
-        raise ValueError(f"Failed to resolve reference '{ref}': {e}") from e
+from xfusion.planning.reference_resolver import resolve_args
+from xfusion.policy.approval import (
+    build_argument_provenance,
+    build_referenced_output_fingerprints,
+    validate_approval_for_invocation,
+)
 
 
 def execute_node(state: AgentGraphState, registry=None) -> AgentGraphState:
@@ -55,32 +29,93 @@ def execute_node(state: AgentGraphState, registry=None) -> AgentGraphState:
         return state
 
     step.status = StepStatus.RUNNING
+    step.failure_class = None
+    step.failure_details = {}
+    step.authorized_output_accepted = False
+    state.step_outputs.pop(step.step_id, None)
+    state.authorized_step_outputs.pop(step.step_id, None)
+    state.last_tool_output = None
+    state.verification_result = None
 
-    # Resolve parameters
-    resolved_params = {}
+    capability = build_default_capability_registry().require(str(step.capability))
+
     try:
-        for k, v in step.parameters.items():
-            resolved_params[k] = resolve_parameter(v, state.step_outputs)
+        resolved_params = resolve_args(
+            step.args,
+            plan=state.plan,
+            authorized_outputs=state.authorized_step_outputs,
+        )
     except ValueError as e:
         step.status = StepStatus.FAILED
+        step.failure_class = "reference_resolution_failed"
+        step.failure_details = {
+            "failure_class": "reference_resolution_failed",
+            "capability": step.capability,
+            "args": step.args,
+            "error": str(e),
+        }
         state.response = f"Parameter resolution failed: {e}"
         return state
 
-    # Execute with resolved parameters
-    output = registry.execute(step.tool, resolved_params)
+    if step.approval_id:
+        approval = state.approval_records.get(step.approval_id)
+        if approval is None:
+            step.status = StepStatus.FAILED
+            step.failure_class = "approval_missing"
+            step.failure_details = {
+                "failure_class": "approval_missing",
+                "approval_id": step.approval_id,
+                "capability": step.capability,
+            }
+            state.response = "Approval required but no approval record exists."
+            return state
+        is_valid, reason = validate_approval_for_invocation(
+            approval=approval,
+            capability=capability,
+            normalized_args=resolved_params,
+            target_context=state.plan.target_context,
+            approval_mode=approval.approval_mode,
+            risk_tier=approval.risk_tier,
+            argument_provenance=build_argument_provenance(step.args),
+            referenced_output_fingerprints=build_referenced_output_fingerprints(
+                step.args, state.authorized_step_outputs
+            ),
+        )
+        if not is_valid:
+            step.status = StepStatus.FAILED
+            step.failure_class = (
+                "approval_invalidated"
+                if reason in {"action_fingerprint_mismatch", "material_change"}
+                else reason
+            )
+            step.failure_details = {
+                "failure_class": step.failure_class,
+                "reason": reason,
+                "approval_id": approval.approval_id,
+                "capability": step.capability,
+                "normalized_args": resolved_params,
+            }
+            state.response = f"Approval invalidated before execution: {reason}"
+            return state
 
-    # Store output in state for real verification AND for downstream steps
-    state.last_tool_output = output.data
-    state.step_outputs[step.step_id] = output.data
-    state.verification_result = None  # Clear previous
+    outcome = ControlledAdapterRuntime(registry).execute(
+        capability=capability,
+        normalized_args=resolved_params,
+    )
 
-    # Tool failure still sets step status to FAILED
-    if "error" in output.data:
+    step.normalized_args = resolved_params
+    step.adapter_id = capability.adapter_id
+    step.redaction_metadata = outcome.redaction_metadata
+
+    if outcome.status != "succeeded" or "error" in outcome.normalized_output:
         step.status = StepStatus.FAILED
-        # We don't set InteractionState.FAILED here, update_node will handle it
-        state.response = f"Step failed: {output.summary}"
+        step.failure_class = outcome.status
+        step.failure_details = outcome.normalized_output
+        state.last_tool_output = None
+        state.response = f"Step failed: {outcome.summary}"
     else:
-        # We do NOT set SUCCESS here. Verification node must do that.
-        state.response = output.summary
+        state.last_tool_output = outcome.normalized_output
+        state.step_outputs[step.step_id] = outcome.normalized_output
+        state.response = outcome.summary
 
     return state

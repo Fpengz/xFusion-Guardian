@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from xfusion.execution.command_runner import CommandRunner
+from xfusion.security.secrets import is_secret_path
 from xfusion.tools.base import ToolOutput
 
 
@@ -42,5 +43,25 @@ class FileTools:
                 "is_dir": target.is_dir(),
                 "size_bytes": stat.st_size,
                 "mtime": stat.st_mtime,
+            },
+        )
+
+    def read_file(self, path: str, max_bytes: int = 4096) -> ToolOutput:
+        """Read a bounded non-secret file snippet."""
+        if is_secret_path(path):
+            return ToolOutput(
+                summary="Refusing to read known secret path.",
+                data={"error": "secret_path"},
+            )
+        target = Path(path)
+        if not target.exists() or not target.is_file():
+            return ToolOutput(summary=f"{path} is not a readable file.", data={"error": "not_file"})
+        data = target.read_text(errors="replace")[: max(0, min(max_bytes, 8192))]
+        return ToolOutput(
+            summary=f"Read bounded snippet from {path}.",
+            data={
+                "path": str(target),
+                "content": data,
+                "truncated": target.stat().st_size > len(data),
             },
         )

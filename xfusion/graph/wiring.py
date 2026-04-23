@@ -12,6 +12,7 @@ from xfusion.graph.nodes.plan import plan_node
 from xfusion.graph.nodes.policy import policy_node
 from xfusion.graph.nodes.respond import respond_node
 from xfusion.graph.nodes.update import update_node
+from xfusion.graph.nodes.validate import validate_node
 from xfusion.graph.nodes.verify import verify_node
 from xfusion.graph.state import AgentGraphState
 
@@ -43,6 +44,17 @@ def route_after_policy(state: AgentGraphState) -> str:
     return "execute"
 
 
+def route_after_validate(state: AgentGraphState) -> str:
+    """Route after mandatory static validation."""
+    if not state.plan:
+        return "respond"
+
+    if state.plan.interaction_state in {"failed", "refused", "aborted"}:
+        return "respond"
+
+    return "policy"
+
+
 def route_after_update(state: AgentGraphState) -> str:
     """Route after state update to decide if we need more steps."""
     if not state.plan:
@@ -51,7 +63,7 @@ def route_after_update(state: AgentGraphState) -> str:
     if state.plan.interaction_state in {"completed", "failed", "aborted", "refused"}:
         return "respond"
 
-    return "policy"
+    return "validate"
 
 
 def build_agent_graph(registry: Any) -> StateGraph:
@@ -66,6 +78,7 @@ def build_agent_graph(registry: Any) -> StateGraph:
     graph.add_node("parse", parse_node)
     graph.add_node("disambiguate", disambiguate_node)
     graph.add_node("plan", plan_node)
+    graph.add_node("validate", validate_node)
     graph.add_node("policy", policy_node)
     graph.add_node("confirm", confirm_node)
     graph.add_node("execute", execute_node_wrapped)
@@ -82,7 +95,11 @@ def build_agent_graph(registry: Any) -> StateGraph:
     )
 
     graph.add_edge("disambiguate", "plan")
-    graph.add_edge("plan", "policy")
+    graph.add_edge("plan", "validate")
+
+    graph.add_conditional_edges(
+        "validate", route_after_validate, {"policy": "policy", "respond": "respond"}
+    )
 
     graph.add_conditional_edges(
         "policy", route_after_policy, {"execute": "execute", "respond": "respond"}
@@ -97,7 +114,7 @@ def build_agent_graph(registry: Any) -> StateGraph:
     graph.add_edge("verify", "update")
 
     graph.add_conditional_edges(
-        "update", route_after_update, {"policy": "policy", "respond": "respond"}
+        "update", route_after_update, {"validate": "validate", "respond": "respond"}
     )
 
     graph.add_edge("respond", END)

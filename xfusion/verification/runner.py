@@ -159,7 +159,8 @@ class FakeWorkflowRegistry:
         if name == "process.kill":
             self.port_occupied = False
             return ToolOutput(
-                summary="Sent signal 15 to PID 4242.", data={"pid": 4242, "signal": 15}
+                summary="Sent TERM to PID 4242.",
+                data={"ok": True, "pid": 4242, "signal": "TERM"},
             )
         return ToolOutput(
             summary=f"Unsupported fake tool {name}.", data={"error": "unsupported_fake_tool"}

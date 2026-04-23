@@ -73,7 +73,7 @@ class SystemTools:
         """Report the current effective user."""
         res = self.runner.run(["id", "-un"])
         user = res.stdout.strip() if res.exit_code == 0 else os.environ.get("USER", "unknown")
-        return ToolOutput(summary=f"Current user: {user}", data={"user": user})
+        return ToolOutput(summary=f"Current user: {user}", data={"username": user})
 
     def check_sudo(self) -> ToolOutput:
         """Report whether passwordless sudo is currently available."""

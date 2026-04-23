@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from xfusion.domain.enums import InteractionState
+from datetime import UTC, datetime
+
+from xfusion.domain.enums import FailureClass, InteractionState
 from xfusion.graph.auditing import log_graph_event
 from xfusion.graph.state import AgentGraphState
 
@@ -16,22 +18,52 @@ def confirm_node(state: AgentGraphState) -> AgentGraphState:
 
     expected = (step.confirmation_phrase or "").strip()
     actual = state.user_input.strip()
+    approval = state.approval_records.get(state.pending_approval_id or step.approval_id or "")
 
-    if expected and actual == expected:
+    if expected and approval and actual == expected and not approval.is_expired():
+        approval.approved_at = datetime.now(UTC)
         state.plan.interaction_state = InteractionState.EXECUTING
         step.requires_confirmation = False
         state.response = "Confirmation received. Proceeding..."
-        log_graph_event(state, step=step, status="confirmed", summary=state.response)
+        log_graph_event(
+            state,
+            step=step,
+            status="approval_granted",
+            summary=state.response,
+            action_taken={"approval_response": approval.model_dump(mode="json")},
+        )
     else:
         state.plan.interaction_state = InteractionState.ABORTED
         state.plan.status = "aborted"
-        state.response = (
-            f"Action aborted: Input did not match required confirmation phrase '{expected}'."
+        reason = "approval_expired" if approval and approval.is_expired() else "phrase_mismatch"
+        step.failure_class = (
+            FailureClass.APPROVAL_EXPIRED.value
+            if reason == "approval_expired"
+            else FailureClass.APPROVAL_DENIED.value
         )
-        log_graph_event(state, step=step, status="aborted", summary=state.response)
+        step.failure_details = {
+            "failure_class": step.failure_class,
+            "approval_id": approval.approval_id if approval else None,
+            "reason": reason,
+        }
+        state.response = f"Action aborted: approval failed ({reason})."
+        if approval:
+            approval.invalidated_at = datetime.now(UTC)
+            approval.invalidation_reason = reason
+        log_graph_event(
+            state,
+            step=step,
+            status="approval_denied",
+            summary=state.response,
+            action_taken={
+                "approval_id": approval.approval_id if approval else None,
+                "reason": reason,
+            },
+        )
 
     # Requirements: Confirmation must be cleared after one use.
     state.pending_confirmation_phrase = None
+    state.pending_approval_id = None
     step.confirmation_phrase = None
 
     return state
