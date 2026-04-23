@@ -1,3 +1,11 @@
+"""Deterministic validator for XFusion capability schema dictionaries.
+
+This module intentionally implements a documented JSON-Schema-like subset,
+not the full JSON Schema vocabulary. Unsupported keywords fail closed so a
+capability cannot appear to enforce constraints that this validator ignores.
+See docs/architecture/schema-subset.md before extending the subset.
+"""
+
 from __future__ import annotations
 
 import re
@@ -40,7 +48,7 @@ SUPPORTED_SCHEMA_KEYWORDS = {
 
 
 class SchemaValidationResult(BaseModel):
-    """Deterministic validation result for capability JSON-schema subsets."""
+    """Deterministic validation result for the supported capability schema subset."""
 
     model_config = ConfigDict(extra="forbid")
 

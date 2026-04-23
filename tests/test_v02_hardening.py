@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
 from xfusion.capabilities.registry import build_default_capability_registry
-from xfusion.capabilities.schema import validate_schema_value
+from xfusion.capabilities.schema import SUPPORTED_SCHEMA_KEYWORDS, validate_schema_value
 from xfusion.domain.enums import InteractionState, PolicyDecisionValue, ReasoningRole, StepStatus
 from xfusion.domain.models.environment import EnvironmentState
 from xfusion.domain.models.execution_plan import ExecutionPlan, PlanStep
@@ -333,6 +334,15 @@ def test_schema_validator_fails_closed_for_unsupported_features() -> None:
 
     assert not result.valid
     assert result.errors == ["$: unsupported schema keyword 'format'"]
+
+
+def test_supported_schema_subset_documentation_matches_validator_keywords() -> None:
+    doc = Path("docs/architecture/schema-subset.md").read_text()
+
+    for keyword in sorted(SUPPORTED_SCHEMA_KEYWORDS):
+        assert f"`{keyword}`" in doc
+    assert "fail closed" in doc
+    assert "xfusion/capabilities/schema.py" in doc
 
 
 def test_malformed_output_is_audited_and_never_becomes_referenceable() -> None:

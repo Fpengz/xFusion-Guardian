@@ -29,7 +29,7 @@ class ControlledInvocation(BaseModel):
 
 
 class AdapterOutcome(BaseModel):
-    """Normalized adapter result after runtime checks and redaction."""
+    """Authoritative adapter result after schema validation and redaction."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -96,7 +96,12 @@ def _failure_outcome(
 
 
 class ControlledAdapterRuntime:
-    """v0.2 runtime wrapper around registered typed capability adapters."""
+    """Trust-boundary wrapper around registered typed capability adapters.
+
+    The executor may call OS-facing adapters, but this runtime owns the
+    deterministic boundary around runtime constraints, output schema validation,
+    redaction, and normalized failure records.
+    """
 
     def __init__(self, executor: CapabilityExecutor) -> None:
         self.executor = executor
