@@ -25,9 +25,11 @@ class ToolRegistry:
         cleanup_tools: CleanupTools | None = None,
     ) -> None:
         runner = system_tools.runner
+        self.runner = runner
         file_tools = file_tools or FileTools(runner)
         user_tools = user_tools or UserTools(runner)
         cleanup_tools = cleanup_tools or CleanupTools(runner)
+        self.last_execution_trace: list[dict[str, object]] = []
 
         self.tools: dict[str, Callable[..., ToolOutput]] = {
             "system.detect_os": system_tools.detect_os,
@@ -50,10 +52,14 @@ class ToolRegistry:
 
     def execute(self, name: str, args: dict[str, Any]) -> ToolOutput:
         """Execute a tool by name with args."""
+        self.last_execution_trace = []
         if name not in self.tools:
             return ToolOutput(summary=f"Tool '{name}' not found.", data={"error": "not_found"})
 
         try:
+            self.runner.begin_trace_session()
             return self.tools[name](**args)
         except Exception as e:
             return ToolOutput(summary=f"Error executing tool '{name}': {e}", data={"error": str(e)})
+        finally:
+            self.last_execution_trace = self.runner.end_trace_session()

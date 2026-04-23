@@ -47,6 +47,7 @@ def log_graph_event(
                 "normalized_args": step.normalized_args or step.args,
                 "argument_provenance": step.argument_provenance,
                 "resolved_references": step.resolved_references,
+                "command_trace": step.command_trace,
                 "repair_of_step_id": step.repair_of_step_id,
                 "repair_proposal_id": step.repair_proposal_id,
                 "output": state.step_outputs.get(step.step_id, {}),

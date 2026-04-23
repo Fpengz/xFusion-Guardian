@@ -64,6 +64,7 @@ def execute_node(state: AgentGraphState, registry=None) -> AgentGraphState:
     step.non_execution_reason_text = None
     step.failure_details = {}
     step.authorized_output_accepted = False
+    step.command_trace = []
     state.step_outputs.pop(step.step_id, None)
     state.authorized_step_outputs.pop(step.step_id, None)
     state.last_tool_output = None
@@ -251,6 +252,8 @@ def execute_node(state: AgentGraphState, registry=None) -> AgentGraphState:
         capability=capability,
         normalized_args=resolved_params,
     )
+    trace = getattr(registry, "last_execution_trace", [])
+    step.command_trace = trace if isinstance(trace, list) else []
 
     step.normalized_args = resolved_params
     step.adapter_id = capability.adapter_id

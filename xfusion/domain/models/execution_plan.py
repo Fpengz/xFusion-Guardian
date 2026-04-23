@@ -41,6 +41,7 @@ class PlanStep(BaseModel):
     non_execution_reason_text: str | None = None
     failure_details: dict[str, object] = Field(default_factory=dict)
     redaction_metadata: dict[str, object] = Field(default_factory=dict)
+    command_trace: list[dict[str, object]] = Field(default_factory=list)
     started_at: str | None = None
     ended_at: str | None = None
     repair_of_step_id: str | None = None
