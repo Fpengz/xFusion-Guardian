@@ -1,3 +1,7 @@
+> [!IMPORTANT]
+> Historical, non-normative v0.1 material. For current behavior, use
+> [docs/specs/xfusion-v0.2.md](../../specs/xfusion-v0.2.md).
+
 # Pydantic v2 + LangGraph Architecture Blueprint
 
 This document defines the current and target architecture for XFusion's **Pydantic v2 + LangGraph-first architecture**, with LangChain used only as optional integration glue.

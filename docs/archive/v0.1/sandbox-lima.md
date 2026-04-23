@@ -1,3 +1,7 @@
+> [!IMPORTANT]
+> Historical, non-normative v0.1 material. For current behavior, use
+> [docs/specs/xfusion-v0.2.md](../../specs/xfusion-v0.2.md).
+
 # Lima Ubuntu Demo Sandbox
 
 The official v0.1 demo sandbox is a local Lima Ubuntu 24.04 VM on Apple Silicon macOS.

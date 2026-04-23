@@ -1,3 +1,7 @@
+> [!IMPORTANT]
+> Historical, non-normative v0.1 material. For current behavior, use
+> [docs/specs/xfusion-v0.2.md](../../specs/xfusion-v0.2.md).
+
 # XFusion v0.1 Tool Definitions
 
 Tools accept structured input and return structured output. They are scoped, non-interactive, and do not expose arbitrary shell passthrough.
@@ -37,4 +41,3 @@ Tools accept structured input and return structured output. They are scoped, non
 ## Planning
 
 - `plan.explain_action`: explains supported actions and safe next steps.
-

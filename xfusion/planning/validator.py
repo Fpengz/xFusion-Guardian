@@ -8,6 +8,7 @@ from typing import Any, cast
 from pydantic import BaseModel, ConfigDict, Field
 
 from xfusion.capabilities.registry import CapabilityRegistry
+from xfusion.capabilities.schema import validate_schema_value
 from xfusion.domain.models.capability import CapabilityDefinition
 from xfusion.domain.models.execution_plan import ExecutionPlan, PlanStep
 
@@ -102,54 +103,35 @@ def _validate_acyclic(steps: list[PlanStep]) -> bool:
     return visited == len(step_ids)
 
 
-def _schema_type_matches(value: object, schema: dict[str, object]) -> bool:
-    expected_type = schema.get("type")
-    if expected_type == "integer":
-        return isinstance(value, int) and not isinstance(value, bool)
-    if expected_type == "number":
-        return isinstance(value, int | float) and not isinstance(value, bool)
-    if expected_type == "string":
-        return isinstance(value, str)
-    if expected_type == "boolean":
-        return isinstance(value, bool)
-    if expected_type == "array":
-        return isinstance(value, list)
-    if expected_type == "object":
-        return isinstance(value, dict)
-    return True
-
-
-def _schema_constraint_errors(value: object, schema: dict[str, object]) -> list[str]:
-    errors: list[str] = []
-    enum_values = schema.get("enum")
-    if isinstance(enum_values, list) and value not in enum_values:
-        errors.append("arg_enum_violation")
-
-    if isinstance(value, int | float) and not isinstance(value, bool):
-        minimum = schema.get("minimum")
-        maximum = schema.get("maximum")
-        if isinstance(minimum, int | float) and value < minimum:
-            errors.append("arg_range_violation")
-        if isinstance(maximum, int | float) and value > maximum:
-            errors.append("arg_range_violation")
-
-    if isinstance(value, str):
-        min_length = schema.get("minLength")
-        max_length = schema.get("maxLength")
-        if isinstance(min_length, int) and len(value) < min_length:
-            errors.append("arg_length_violation")
-        if isinstance(max_length, int) and len(value) > max_length:
-            errors.append("arg_length_violation")
-
-    if isinstance(value, list):
-        min_items = schema.get("minItems")
-        max_items = schema.get("maxItems")
-        if isinstance(min_items, int) and len(value) < min_items:
-            errors.append("arg_length_violation")
-        if isinstance(max_items, int) and len(value) > max_items:
-            errors.append("arg_length_violation")
-
-    return errors
+def _schema_error_code(error: str) -> str:
+    if "not one of" in error:
+        return "arg_enum_violation"
+    if any(
+        marker in error
+        for marker in (
+            "below minimum",
+            "above maximum",
+            "exclusiveMinimum",
+            "exclusiveMaximum",
+            "multipleOf",
+        )
+    ):
+        return "arg_range_violation"
+    if any(
+        marker in error
+        for marker in (
+            "minLength",
+            "maxLength",
+            "minItems",
+            "maxItems",
+            "minProperties",
+            "maxProperties",
+        )
+    ):
+        return "arg_length_violation"
+    if "expected" in error:
+        return "arg_type_mismatch"
+    return "arg_schema_violation"
 
 
 def _validate_literal_args(
@@ -191,31 +173,29 @@ def _validate_literal_args(
         if isinstance(arg_value, dict) and "ref" in arg_value:
             continue
         arg_schema = typed_properties[arg_name]
-        if isinstance(arg_schema, dict) and not _schema_type_matches(
-            arg_value, cast(dict[str, object], arg_schema)
-        ):
+        if not isinstance(arg_schema, dict):
             errors.append(
                 PlanValidationError(
-                    code="arg_type_mismatch",
+                    code="arg_schema_violation",
                     step_id=step.step_id,
-                    message=f"Step '{step.step_id}' arg '{arg_name}' does not match schema.",
+                    message=f"Step '{step.step_id}' arg '{arg_name}' has invalid schema.",
                 )
             )
             continue
-        if isinstance(arg_schema, dict):
-            for constraint_code in _schema_constraint_errors(
-                arg_value, cast(dict[str, object], arg_schema)
-            ):
-                errors.append(
-                    PlanValidationError(
-                        code=constraint_code,
-                        step_id=step.step_id,
-                        message=(
-                            f"Step '{step.step_id}' arg '{arg_name}' violates "
-                            "capability schema constraints."
-                        ),
-                    )
+        schema_result = validate_schema_value(
+            arg_value, cast(dict[str, Any], arg_schema), path=f"$.{arg_name}"
+        )
+        for validation_error in schema_result.errors:
+            errors.append(
+                PlanValidationError(
+                    code=_schema_error_code(validation_error),
+                    step_id=step.step_id,
+                    message=(
+                        f"Step '{step.step_id}' arg '{arg_name}' violates "
+                        f"capability schema constraints: {validation_error}"
+                    ),
                 )
+            )
 
 
 def validate_plan(

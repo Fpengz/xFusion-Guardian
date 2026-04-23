@@ -1,3 +1,7 @@
+> [!IMPORTANT]
+> Historical, non-normative v0.1 material. For current behavior, use
+> [docs/specs/xfusion-v0.2.md](../../specs/xfusion-v0.2.md).
+
 # XFusion v0.1 Core Agent Prompt
 
 This prompt documents the intended LLM boundary for v0.1. The current implementation keeps final policy and execution authorization deterministic.
@@ -26,4 +30,3 @@ Deterministic system components make the final decisions for:
 - tool authorization
 - verification status
 ```
-

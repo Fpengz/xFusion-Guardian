@@ -6,9 +6,17 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from xfusion.capabilities.registry import build_default_capability_registry
+from xfusion.capabilities.registry import CapabilityRegistry, build_default_capability_registry
 from xfusion.capabilities.schema import SUPPORTED_SCHEMA_KEYWORDS, validate_schema_value
-from xfusion.domain.enums import InteractionState, PolicyDecisionValue, ReasoningRole, StepStatus
+from xfusion.domain.enums import (
+    ApprovalMode,
+    InteractionState,
+    PolicyDecisionValue,
+    ReasoningRole,
+    RiskTier,
+    StepStatus,
+)
+from xfusion.domain.models.capability import CapabilityDefinition, RuntimeConstraints
 from xfusion.domain.models.environment import EnvironmentState
 from xfusion.domain.models.execution_plan import ExecutionPlan, PlanStep
 from xfusion.execution.command_runner import CommandResult, CommandRunner
@@ -336,13 +344,88 @@ def test_schema_validator_fails_closed_for_unsupported_features() -> None:
     assert result.errors == ["$: unsupported schema keyword 'format'"]
 
 
-def test_supported_schema_subset_documentation_matches_validator_keywords() -> None:
-    doc = Path("docs/architecture/schema-subset.md").read_text()
+def _test_capability(
+    *,
+    input_schema: dict[str, object],
+    output_schema: dict[str, object] | None = None,
+) -> CapabilityDefinition:
+    return CapabilityDefinition(
+        name="test.capability",
+        version=1,
+        verb="read",
+        object="test",
+        risk_tier=RiskTier.TIER_0,
+        approval_mode=ApprovalMode.AUTO,
+        allowed_environments=["dev"],
+        allowed_actor_types=["assistant"],
+        scope_model={},
+        input_schema=input_schema,
+        output_schema=output_schema or {"type": "object", "additionalProperties": False},
+        runtime_constraints=RuntimeConstraints(),
+        adapter_id="test.capability",
+        is_read_only=True,
+        preview_builder="default",
+        verification_recommendation="none",
+        redaction_policy="standard",
+    )
+
+
+def test_capability_registry_rejects_unsupported_schema_keywords_at_registration() -> None:
+    capability = _test_capability(
+        input_schema={
+            "type": "object",
+            "properties": {"email": {"type": "string", "format": "email"}},
+            "additionalProperties": False,
+        }
+    )
+
+    with pytest.raises(ValueError, match="unsupported schema keyword 'format'"):
+        CapabilityRegistry([capability])
+
+
+def test_capability_registry_rejects_malformed_schemas_at_registration() -> None:
+    capability = _test_capability(
+        input_schema={
+            "type": "object",
+            "properties": [],
+            "additionalProperties": False,
+        }
+    )
+
+    with pytest.raises(ValueError, match="properties must be an object"):
+        CapabilityRegistry([capability])
+
+
+def test_capability_schema_documentation_matches_validator_keywords() -> None:
+    doc = Path("docs/architecture/capability-schema.md").read_text()
 
     for keyword in sorted(SUPPORTED_SCHEMA_KEYWORDS):
         assert f"`{keyword}`" in doc
     assert "fail closed" in doc
     assert "xfusion/capabilities/schema.py" in doc
+
+
+def test_docs_make_v02_normative_and_archive_v01_materials() -> None:
+    readme = Path("README.md").read_text()
+    assert "docs/specs/xfusion-v0.2.md" in readme
+    assert "docs/specs/xfusion-v0.1.md" not in readme
+
+    archive_root = Path("docs/archive")
+    archived_docs = sorted(archive_root.rglob("*.md"))
+    assert archived_docs
+    for path in archived_docs:
+        doc = path.read_text()
+        assert doc.startswith("> [!IMPORTANT]\n> Historical, non-normative")
+        assert "docs/specs/xfusion-v0.2.md" in doc
+
+    active_docs = [
+        path
+        for path in Path("docs").rglob("*.md")
+        if "archive" not in path.parts and path != Path("docs/specs/xfusion-v0.2.md")
+    ]
+    for path in active_docs:
+        doc = path.read_text()
+        assert "XFusion v0.1" not in doc
 
 
 def test_malformed_output_is_audited_and_never_becomes_referenceable() -> None:

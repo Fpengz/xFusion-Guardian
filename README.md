@@ -74,14 +74,10 @@ Important trust boundary:
 
 - [xfusion/](xfusion/) - Python package and agent implementation
 - [docs/specs/xfusion-v0.2.md](docs/specs/xfusion-v0.2.md) - normative v0.2 spec
-- [docs/architecture/schema-subset.md](docs/architecture/schema-subset.md) - supported capability schema subset
-- [docs/release-readiness-v0.2.md](docs/release-readiness-v0.2.md) - reviewer notes and known limitations
-- [docs/specs/xfusion-v0.1.md](docs/specs/xfusion-v0.1.md) - historical v0.1 spec
-- [docs/architecture/pydantic-langgraph-blueprint.md](docs/architecture/pydantic-langgraph-blueprint.md) - target architecture blueprint
-- [docs/demo-script.md](docs/demo-script.md) - seven-scenario acceptance demo
-- [docs/sandbox-lima.md](docs/sandbox-lima.md) - Lima sandbox setup
-- [docs/tools.md](docs/tools.md) - tool surface and guarantees
+- [docs/architecture/capability-schema.md](docs/architecture/capability-schema.md) - XFusion Capability Schema contract
+- [docs/release-readiness-v0.2.md](docs/release-readiness-v0.2.md) - reviewer notes
 - [docs/verification-suite.md](docs/verification-suite.md) - verification suite design
+- [docs/archive/v0.1/](docs/archive/v0.1/) - historical, non-normative legacy materials
 - [verification/scenarios/](verification/scenarios/) - YAML scenario suite
 - [tests/](tests/) - smoke, safety, workflow, and verification runner tests
 - [AGENTS.md](AGENTS.md) - context guide for future agents and engineers
@@ -172,7 +168,8 @@ the dangerous decisions inspectable and controllable.
 ## Status
 
 v0.2 capability-governed execution is implemented and tested. The v0.2 spec is
-the normative source of truth; v0.1 materials remain for historical demo context.
+the normative source of truth. Legacy materials live only in the historical
+archive and are explicitly non-normative.
 
 | Area | Status |
 | --- | --- |

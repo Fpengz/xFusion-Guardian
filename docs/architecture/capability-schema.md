@@ -1,9 +1,9 @@
-# Capability Schema Subset
+# XFusion Capability Schema
 
-XFusion v0.2 uses code-defined JSON-Schema-like dictionaries for capability
-`input_schema` and `output_schema` validation. The normative product behavior is
-defined in [docs/specs/xfusion-v0.2.md](../specs/xfusion-v0.2.md); this note
-documents the currently implemented validator subset for maintainers.
+XFusion v0.2 uses code-defined XFusion Capability Schema dictionaries for
+capability `input_schema` and `output_schema` validation. The normative product
+behavior is defined in [docs/specs/xfusion-v0.2.md](../specs/xfusion-v0.2.md);
+this note defines the supported schema contract for maintainers.
 
 The canonical implementation is [xfusion/capabilities/schema.py](../../xfusion/capabilities/schema.py).
 Extend that module and its tests when adding schema support. Do not add schema
@@ -11,7 +11,7 @@ keywords only in capability definitions and assume they are enforced.
 
 ## Supported Keywords
 
-The central runtime validator currently recognizes these keywords:
+The central validator recognizes these keywords:
 
 | Keyword | Supported behavior |
 | --- | --- |
@@ -46,14 +46,18 @@ The central runtime validator currently recognizes these keywords:
 | `type` | Supports `object`, `array`, `string`, `integer`, `number`, `boolean`, `null`, and lists of those names. |
 | `uniqueItems` | `true` requires array items to be unique by Python equality. |
 
-This is intentionally a subset, not a full JSON Schema implementation.
+This is an explicit XFusion contract inspired by JSON Schema. It is not a
+general standards-compliant JSON Schema implementation, and maintainers should
+not rely on unlisted JSON Schema vocabulary.
 
-## Unsupported Keywords Fail Closed
+## Unsupported Or Malformed Schemas Fail Closed
 
-Any keyword outside the supported set makes validation fail with an
-`unsupported schema keyword` error. This applies recursively inside nested
-`properties`, `items`, `additionalProperties`, `contains`, `not`, `allOf`,
-`anyOf`, and `oneOf` schemas.
+Any keyword outside the supported set makes schema validation fail with an
+`unsupported schema keyword` error. Malformed supported keywords also fail the
+schema contract, for example non-object `properties`, non-list `required`,
+invalid `type` names, invalid regex `pattern` values, invalid combiners, and
+invalid numeric bounds. These checks run at capability registration/startup and
+runtime value validation uses the same authoritative contract.
 
 Common unsupported examples include:
 
@@ -82,16 +86,19 @@ closed turns that mismatch into an explicit validation failure instead.
 
 ## Input And Output Validation
 
-Capability outputs are validated centrally in
+Capability schemas are validated when a `CapabilityRegistry` is constructed.
+Invalid schemas prevent registration and startup. Capability outputs are
+validated centrally in
 [xfusion/execution/runtime.py](../../xfusion/execution/runtime.py) before
 redaction, audit exposure, final response generation, or downstream reference
 use. Output schema validation failures are normalized as structured adapter
 outcomes and do not become successful upstream outputs.
 
 Capability inputs are checked during static plan validation and after reference
-resolution. Input schemas should stay simple, closed objects where possible:
-declare every accepted argument under `properties`, list required arguments in
-`required`, and set `additionalProperties` to `false`.
+resolution using the same XFusion Capability Schema contract. Input schemas
+should stay simple, closed objects where possible: declare every accepted
+argument under `properties`, list required arguments in `required`, and set
+`additionalProperties` to `false`.
 
 ## Extending The Subset
 
@@ -103,5 +110,5 @@ To add support for a new keyword:
 3. Add or update capability registry tests if registered capabilities start
    depending on the new keyword.
 4. Update this document in the same change.
-5. Keep unsupported or partially understood features failing closed until they
-   have deterministic validation coverage.
+5. Keep unsupported or newly proposed features failing closed until they have
+   deterministic validation coverage.

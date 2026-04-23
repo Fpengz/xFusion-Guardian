@@ -1,9 +1,9 @@
-"""Deterministic validator for XFusion capability schema dictionaries.
+"""Deterministic validator for XFusion Capability Schema dictionaries.
 
-This module intentionally implements a documented JSON-Schema-like subset,
-not the full JSON Schema vocabulary. Unsupported keywords fail closed so a
-capability cannot appear to enforce constraints that this validator ignores.
-See docs/architecture/schema-subset.md before extending the subset.
+XFusion Capability Schema is an explicit, frozen v0.2 contract inspired by JSON
+Schema. It is not a general JSON Schema implementation. Unsupported or malformed
+schema features fail closed before capability registration succeeds.
+See docs/architecture/capability-schema.md before extending the contract.
 """
 
 from __future__ import annotations
@@ -46,14 +46,34 @@ SUPPORTED_SCHEMA_KEYWORDS = {
     "$comment",
 }
 
+SUPPORTED_SCHEMA_TYPES = {
+    "object",
+    "array",
+    "string",
+    "integer",
+    "number",
+    "boolean",
+    "null",
+}
+
 
 class SchemaValidationResult(BaseModel):
-    """Deterministic validation result for the supported capability schema subset."""
+    """Deterministic validation result for the XFusion Capability Schema contract."""
 
     model_config = ConfigDict(extra="forbid")
 
     valid: bool
     errors: list[str] = Field(default_factory=list)
+
+
+def validate_schema_contract(
+    schema: dict[str, Any],
+    *,
+    path: str = "$",
+) -> SchemaValidationResult:
+    """Validate a code-defined schema against the XFusion Capability Schema contract."""
+    errors = _schema_contract_errors(schema, path)
+    return SchemaValidationResult(valid=not errors, errors=errors)
 
 
 def validate_schema_value(
@@ -62,14 +82,14 @@ def validate_schema_value(
     *,
     path: str = "$",
 ) -> SchemaValidationResult:
-    """Validate runtime values against the supported capability JSON Schema subset.
+    """Validate runtime values against the XFusion Capability Schema contract.
 
-    Unsupported schema keywords are deterministic failures so code-defined schemas
-    cannot silently claim coverage for constraints this lightweight validator does
+    Unsupported or malformed schemas are deterministic failures so code-defined
+    schemas cannot silently claim coverage for constraints this validator does
     not enforce.
     """
     errors: list[str] = []
-    errors.extend(_unsupported_keyword_errors(schema, path))
+    errors.extend(validate_schema_contract(schema, path=path).errors)
     if errors:
         return SchemaValidationResult(valid=False, errors=errors)
 
@@ -233,28 +253,149 @@ def _validate_combiner(value: Any, schema: dict[str, Any], keyword: str, path: s
     return []
 
 
-def _unsupported_keyword_errors(schema: dict[str, Any], path: str) -> list[str]:
-    errors = [
+def _schema_contract_errors(schema: dict[str, Any], path: str) -> list[str]:
+    errors: list[str] = [
         f"{path}: unsupported schema keyword {key!r}"
         for key in schema
         if key not in SUPPORTED_SCHEMA_KEYWORDS
     ]
-    for key, nested in schema.get("properties", {}).items():
-        if isinstance(nested, dict):
-            errors.extend(_unsupported_keyword_errors(nested, f"{path}.{key}"))
+
+    expected_type = schema.get("type")
+    if expected_type is not None:
+        errors.extend(_type_contract_errors(expected_type, path))
+
+    properties = schema.get("properties")
+    if properties is not None:
+        if not isinstance(properties, dict):
+            errors.append(f"{path}.properties: properties must be an object")
+        else:
+            for key, nested in properties.items():
+                if not isinstance(key, str):
+                    errors.append(f"{path}.properties: property names must be strings")
+                    continue
+                if not isinstance(nested, dict):
+                    errors.append(f"{path}.{key}: property schema must be an object")
+                    continue
+                errors.extend(_schema_contract_errors(nested, f"{path}.{key}"))
+
+    required = schema.get("required")
+    if required is not None and (
+        not isinstance(required, list) or not all(isinstance(item, str) for item in required)
+    ):
+        errors.append(f"{path}.required: required must be a list of strings")
+
+    enum_values = schema.get("enum")
+    if enum_values is not None and not isinstance(enum_values, list):
+        errors.append(f"{path}.enum: enum must be a list")
+
+    pattern = schema.get("pattern")
+    if pattern is not None:
+        if not isinstance(pattern, str):
+            errors.append(f"{path}.pattern: pattern must be a string")
+        else:
+            try:
+                re.compile(pattern)
+            except re.error as exc:
+                errors.append(f"{path}.pattern: invalid pattern {pattern!r}: {exc}")
+
+    additional_properties = schema.get("additionalProperties")
+    if additional_properties is not None and not isinstance(additional_properties, bool | dict):
+        errors.append(
+            f"{path}.additionalProperties: additionalProperties must be a boolean or schema"
+        )
+
+    for keyword in (
+        "minItems",
+        "maxItems",
+        "minContains",
+        "maxContains",
+        "minLength",
+        "maxLength",
+        "minProperties",
+        "maxProperties",
+    ):
+        value = schema.get(keyword)
+        if value is not None and (
+            not isinstance(value, int) or isinstance(value, bool) or value < 0
+        ):
+            errors.append(f"{path}.{keyword}: {keyword} must be a non-negative integer")
+
+    unique_items = schema.get("uniqueItems")
+    if unique_items is not None and not isinstance(unique_items, bool):
+        errors.append(f"{path}.uniqueItems: uniqueItems must be a boolean")
+
+    for keyword in ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"):
+        value = schema.get(keyword)
+        if value is not None and (not isinstance(value, int | float) or isinstance(value, bool)):
+            errors.append(f"{path}.{keyword}: {keyword} must be a number")
+    multiple_of = schema.get("multipleOf")
+    if (
+        isinstance(multiple_of, int | float)
+        and not isinstance(multiple_of, bool)
+        and multiple_of <= 0
+    ):
+        errors.append(f"{path}.multipleOf: multipleOf must be greater than zero")
+
     for keyword in ("items", "additionalProperties", "contains", "not"):
         nested = schema.get(keyword)
         if isinstance(nested, dict):
-            errors.extend(_unsupported_keyword_errors(nested, path))
+            errors.extend(_schema_contract_errors(nested, f"{path}.{keyword}"))
+        elif keyword in schema and keyword in {"items", "contains", "not"}:
+            errors.append(f"{path}.{keyword}: {keyword} must be a schema object")
+
     for keyword in ("allOf", "anyOf", "oneOf"):
         nested_list = schema.get(keyword)
-        if isinstance(nested_list, list):
-            for index, nested in enumerate(nested_list):
-                if isinstance(nested, dict):
-                    nested_schema = cast(dict[str, Any], nested)
-                    errors.extend(
-                        _unsupported_keyword_errors(nested_schema, f"{path}.{keyword}[{index}]")
-                    )
+        if nested_list is None:
+            continue
+        if not isinstance(nested_list, list) or not nested_list:
+            errors.append(f"{path}.{keyword}: {keyword} must be a non-empty list of schemas")
+            continue
+        for index, nested in enumerate(nested_list):
+            if not isinstance(nested, dict):
+                errors.append(f"{path}.{keyword}[{index}]: schema must be an object")
+                continue
+            nested_schema = cast(dict[str, Any], nested)
+            errors.extend(_schema_contract_errors(nested_schema, f"{path}.{keyword}[{index}]"))
+
+    errors.extend(_bound_order_errors(schema, path))
+    return errors
+
+
+def _type_contract_errors(expected_type: object, path: str) -> list[str]:
+    if isinstance(expected_type, str):
+        if expected_type not in SUPPORTED_SCHEMA_TYPES:
+            return [f"{path}.type: unsupported type {expected_type!r}"]
+        return []
+    if isinstance(expected_type, list) and expected_type:
+        errors: list[str] = []
+        for index, item in enumerate(expected_type):
+            if not isinstance(item, str) or item not in SUPPORTED_SCHEMA_TYPES:
+                errors.append(f"{path}.type[{index}]: unsupported type {item!r}")
+        return errors
+    return [f"{path}.type: type must be a string or non-empty list of strings"]
+
+
+def _bound_order_errors(schema: dict[str, Any], path: str) -> list[str]:
+    errors: list[str] = []
+    bound_pairs = (
+        ("minItems", "maxItems"),
+        ("minLength", "maxLength"),
+        ("minProperties", "maxProperties"),
+        ("minimum", "maximum"),
+        ("exclusiveMinimum", "exclusiveMaximum"),
+        ("minContains", "maxContains"),
+    )
+    for lower_name, upper_name in bound_pairs:
+        lower = schema.get(lower_name)
+        upper = schema.get(upper_name)
+        if (
+            isinstance(lower, int | float)
+            and isinstance(upper, int | float)
+            and not isinstance(lower, bool)
+            and not isinstance(upper, bool)
+            and lower > upper
+        ):
+            errors.append(f"{path}: {lower_name} must be less than or equal to {upper_name}")
     return errors
 
 

@@ -34,15 +34,15 @@ For the main execution path, read these files in order:
 10. [tests/test_v02_contracts.py](../tests/test_v02_contracts.py) and
     [tests/test_v02_hardening.py](../tests/test_v02_hardening.py)
 
-## Known Limitations
+## Intentional Boundaries
 
-- Full JSON Schema vocabulary is not implemented. The supported subset and
-  fail-closed boundary are documented in
-  [docs/architecture/schema-subset.md](architecture/schema-subset.md).
-- Unsupported schema keywords fail validation by design rather than being
-  ignored.
-- The v0.1 docs and demo materials remain in the repo for historical/demo
-  continuity. The v0.2 spec is the normative source for current behavior.
+- XFusion uses the explicit XFusion Capability Schema contract documented in
+  [docs/architecture/capability-schema.md](architecture/capability-schema.md), not a
+  general JSON Schema compatibility promise.
+- Unsupported schema keywords fail validation by design at capability
+  registration/startup and at runtime rather than being ignored.
+- Legacy materials are archived under [docs/archive/v0.1](archive/v0.1) with
+  non-normative banners. The v0.2 spec is the current source of truth.
 - SSH, web UI, voice, persistent memory, unrestricted shell execution, and
   multi-agent orchestration remain non-goals for this release.
 

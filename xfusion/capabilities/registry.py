@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from xfusion.capabilities.schema import validate_schema_contract
 from xfusion.domain.enums import ApprovalMode, RiskTier
 from xfusion.domain.models.capability import CapabilityDefinition, RuntimeConstraints
 
@@ -10,7 +11,23 @@ class CapabilityRegistry:
     """Code-defined registry for v0.2 capabilities."""
 
     def __init__(self, capabilities: Iterable[CapabilityDefinition]) -> None:
-        self._capabilities = {capability.name: capability for capability in capabilities}
+        validated_capabilities: dict[str, CapabilityDefinition] = {}
+        errors: list[str] = []
+        for capability in capabilities:
+            if capability.name in validated_capabilities:
+                errors.append(f"{capability.name}: duplicate capability name")
+            for schema_name, schema in (
+                ("input_schema", capability.input_schema),
+                ("output_schema", capability.output_schema),
+            ):
+                result = validate_schema_contract(schema)
+                if not result.valid:
+                    for error in result.errors:
+                        errors.append(f"{capability.name}.{schema_name}: {error}")
+            validated_capabilities[capability.name] = capability
+        if errors:
+            raise ValueError("Invalid capability schema contract: " + "; ".join(errors))
+        self._capabilities = validated_capabilities
 
     def has(self, name: str) -> bool:
         return name in self._capabilities
