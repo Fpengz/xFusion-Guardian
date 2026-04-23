@@ -69,17 +69,35 @@ def evaluate_policy(
     request_intent: str = "operation",
     prior_approval_state: dict[str, object] | None = None,
     time_quota_context: dict[str, object] | None = None,
-    tool: str | None = None,
-    parameters: dict[str, object] | None = None,
 ) -> PolicyDecision:
     """Return the v0.2 deterministic policy decision for a capability invocation.
 
-    ``tool`` and ``parameters`` are accepted only as an isolated migration shim for
-    older callers; the authoritative inputs are ``capability_name`` and
-    ``resolved_args``.
+    This function is authoritative for allow/require_approval/deny decisions
+    and defaults to deny when invocation inputs or matching rules are unclear.
     """
-    name = capability_name or tool or ""
-    args = resolved_args if resolved_args is not None else parameters or {}
+    if not capability_name:
+        return _decision(
+            decision=PolicyDecisionValue.DENY,
+            matched_rule_id="default.invalid_invocation_contract",
+            capability=None,
+            risk_tier=RiskTier.TIER_3,
+            approval_mode=ApprovalMode.DENY,
+            reason="Missing required capability name for policy evaluation.",
+            reason_codes=["invalid_policy_invocation", "deny_by_default"],
+        )
+    if resolved_args is None:
+        return _decision(
+            decision=PolicyDecisionValue.DENY,
+            matched_rule_id="default.invalid_invocation_contract",
+            capability=None,
+            risk_tier=RiskTier.TIER_3,
+            approval_mode=ApprovalMode.DENY,
+            reason="Missing required resolved args for policy evaluation.",
+            reason_codes=["invalid_policy_invocation", "deny_by_default"],
+        )
+
+    name = capability_name
+    args = resolved_args
     registry = build_default_capability_registry()
     capability = registry.get(name)
 

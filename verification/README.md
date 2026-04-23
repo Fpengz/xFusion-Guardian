@@ -56,6 +56,10 @@ expected:
   verification_outcome: port_free
 ```
 
+## v0.2 Verification Dataset Strategy
+
+The future of XFusion verification is based on authoritative pipeline state transitions. See [docs/verification-dataset-strategy.md](../docs/verification-dataset-strategy.md) for the normative v0.2 strategy.
+
 ## Run
 
 ```bash

@@ -10,6 +10,9 @@ normative behavior remains [docs/specs/xfusion-v0.2.md](specs/xfusion-v0.2.md).
 - Static validation rejects unknown capabilities, conflicting legacy fields,
   invalid dependencies, fabricated references, unknown args, and schema
   mismatches before policy or execution.
+- Legacy-only invocation fields are fail-closed: `tool`, `parameters`, and
+  `dependencies` cannot be used without canonical `capability`, `args`, and
+  `depends_on`.
 - Policy, approval, runtime constraints, output normalization, redaction,
   verification, and audit records form the deterministic authority path.
 - Adapter outputs are centrally schema-validated before they can be audited as
@@ -17,6 +20,10 @@ normative behavior remains [docs/specs/xfusion-v0.2.md](specs/xfusion-v0.2.md).
   explanations.
 - Final responses are derived from authoritative audit state, including the
   final explanation snapshot.
+- Verification outcomes and repairs are now typed and auditable, including
+  verification-to-repair transition linkage and deterministic repair re-entry.
+- Runtime role-boundary enforcement now records attributable accepted/rejected/
+  downgraded role proposals in audit-visible state.
 
 ## Reviewer Path
 
@@ -33,6 +40,10 @@ For the main execution path, read these files in order:
 9. [xfusion/graph/response.py](../xfusion/graph/response.py)
 10. [tests/test_v02_contracts.py](../tests/test_v02_contracts.py) and
     [tests/test_v02_hardening.py](../tests/test_v02_hardening.py)
+11. [xfusion/graph/nodes/verify.py](../xfusion/graph/nodes/verify.py)
+12. [xfusion/roles/contracts.py](../xfusion/roles/contracts.py)
+13. [xfusion/domain/models/verification.py](../xfusion/domain/models/verification.py)
+14. [tests/test_verification_repair_roles.py](../tests/test_verification_repair_roles.py)
 
 ## Intentional Boundaries
 
@@ -45,6 +56,25 @@ For the main execution path, read these files in order:
   non-normative banners. The v0.2 spec is the current source of truth.
 - SSH, web UI, voice, persistent memory, unrestricted shell execution, and
   multi-agent orchestration remain non-goals for this release.
+
+## Current Residual Risks
+
+These are known follow-on hardening areas, not hidden debt:
+
+- Repair generation is intentionally narrow and deterministic; it is not yet a
+  broad semantic repair planner.
+- Equivalent-repair approval reuse is fail-closed but currently controlled by
+  simple policy logic (`approval_summary` gate) rather than richer policy-table
+  declarations.
+- Role boundaries are runtime-enforced and auditable but not physically isolated
+  into separate runtimes/processes.
+- Runtime network denial and containment remain declarative guardrails, not full
+  OS-level sandbox isolation.
+- Verification dataset integration is focused on high-value repair/role
+  invariants; broader corpus expansion remains a follow-on track.
+
+See [docs/review-merge-readiness-v0.2.2.md](review-merge-readiness-v0.2.2.md)
+for reviewer-facing PR summary, review guide, and follow-on backlog packaging.
 
 ## Verification Gate
 

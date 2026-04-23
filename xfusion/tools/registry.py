@@ -48,12 +48,12 @@ class ToolRegistry:
             "cleanup.safe_disk_cleanup": cleanup_tools.safe_disk_cleanup,
         }
 
-    def execute(self, name: str, parameters: dict[str, Any]) -> ToolOutput:
-        """Execute a tool by name with parameters."""
+    def execute(self, name: str, args: dict[str, Any]) -> ToolOutput:
+        """Execute a tool by name with args."""
         if name not in self.tools:
             return ToolOutput(summary=f"Tool '{name}' not found.", data={"error": "not_found"})
 
         try:
-            return self.tools[name](**parameters)
+            return self.tools[name](**args)
         except Exception as e:
             return ToolOutput(summary=f"Error executing tool '{name}': {e}", data={"error": str(e)})

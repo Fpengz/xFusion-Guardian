@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -82,6 +83,25 @@ class RoleProposalValidationResult(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
 
+class RoleProposalRuntimeRecord(BaseModel):
+    """Runtime-attributed role proposal enforcement record.
+
+    This makes role-boundary decisions observable in authoritative audit state.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    proposal: RoleProposal
+    validation: RoleProposalValidationResult
+    accepted: bool
+    disposition: str = Field(pattern="^(accepted|rejected|downgraded)$")
+    effective_payload: dict[str, Any] = Field(default_factory=dict)
+    reason_codes: list[str] = Field(default_factory=list)
+    deterministic_layer: str = Field(min_length=1)
+    attributable_step_id: str | None = None
+    recorded_at: str
+
+
 def build_default_role_contracts() -> dict[ReasoningRole, RoleContract]:
     """Return explicit role contracts; deterministic infrastructure remains authoritative."""
     budgets = {
@@ -139,4 +159,111 @@ def validate_role_proposal(
     if proposal.role == ReasoningRole.EXPLANATION and not proposal.consumes_redacted_inputs_only:
         errors.append("Explanation role proposals may consume only audited redacted inputs.")
 
+    errors.extend(_role_payload_guard_errors(proposal))
+
     return RoleProposalValidationResult(valid=not errors, errors=errors)
+
+
+def enforce_role_proposal(
+    proposal: RoleProposal,
+    *,
+    contracts: dict[ReasoningRole, RoleContract] | None = None,
+    deterministic_layer: str,
+    attributable_step_id: str | None = None,
+) -> RoleProposalRuntimeRecord:
+    """Enforce role boundaries and return an attributable runtime record."""
+    validation = validate_role_proposal(proposal, contracts=contracts)
+    payload_guard_errors = _role_payload_guard_errors(proposal)
+
+    if validation.valid:
+        return RoleProposalRuntimeRecord(
+            proposal=proposal,
+            validation=validation,
+            accepted=True,
+            disposition="accepted",
+            effective_payload=proposal.payload,
+            reason_codes=[],
+            deterministic_layer=deterministic_layer,
+            attributable_step_id=attributable_step_id,
+            recorded_at=datetime.now(UTC).isoformat(),
+        )
+
+    # Safe downgrade is only allowed when the type contract is valid and payload-only rules failed.
+    type_contract_valid = not any(
+        "not allowed" in error or "must be non-authoritative" in error
+        for error in validation.errors
+    )
+    if type_contract_valid and payload_guard_errors:
+        return RoleProposalRuntimeRecord(
+            proposal=proposal,
+            validation=validation,
+            accepted=False,
+            disposition="downgraded",
+            effective_payload={},
+            reason_codes=payload_guard_errors,
+            deterministic_layer=deterministic_layer,
+            attributable_step_id=attributable_step_id,
+            recorded_at=datetime.now(UTC).isoformat(),
+        )
+
+    return RoleProposalRuntimeRecord(
+        proposal=proposal,
+        validation=validation,
+        accepted=False,
+        disposition="rejected",
+        effective_payload={},
+        reason_codes=validation.errors,
+        deterministic_layer=deterministic_layer,
+        attributable_step_id=attributable_step_id,
+        recorded_at=datetime.now(UTC).isoformat(),
+    )
+
+
+def _role_payload_guard_errors(proposal: RoleProposal) -> list[str]:
+    errors: list[str] = []
+    payload_keys = {str(key).lower() for key in proposal.payload}
+    payload = proposal.payload
+
+    if proposal.role == ReasoningRole.OBSERVATION:
+        capability = str(payload.get("capability", ""))
+        risk_tier = str(payload.get("risk_tier", "")).lower()
+        if capability in {
+            "process.kill",
+            "cleanup.safe_disk_cleanup",
+            "user.create",
+            "user.delete",
+        }:
+            errors.append("Observation proposals cannot emit mutation capabilities.")
+        if risk_tier and risk_tier != RiskTier.TIER_0.value:
+            errors.append("Observation proposals must remain in tier_0.")
+
+    if proposal.role == ReasoningRole.DIAGNOSIS:
+        forbidden = payload_keys & {"policy_decision", "risk_tier", "approval_mode", "authorize"}
+        if forbidden:
+            errors.append(
+                "Diagnosis proposals cannot alter policy, risk tier, or authorization state."
+            )
+
+    if proposal.role == ReasoningRole.PLANNING:
+        forbidden = payload_keys & {
+            "approval_granted",
+            "authorized",
+            "policy_override",
+            "risk_tier",
+        }
+        if forbidden:
+            errors.append("Planning proposals cannot authorize or override policy/risk.")
+
+    if proposal.role == ReasoningRole.VERIFICATION:
+        if payload.get("auto_execute_repair") is True:
+            errors.append("Verification proposals cannot auto-execute mutation repairs.")
+        forbidden = payload_keys & {"authorize", "approval_granted", "execute_now"}
+        if forbidden:
+            errors.append("Verification proposals cannot authorize or execute actions.")
+
+    if proposal.role == ReasoningRole.EXPLANATION:
+        forbidden = payload_keys & {"mutate_audit", "overwrite_audit", "execute", "authorize"}
+        if forbidden:
+            errors.append("Explanation proposals cannot mutate authoritative records.")
+
+    return errors

@@ -13,7 +13,7 @@ from xfusion.tools.base import ToolOutput
 
 
 class CapabilityExecutor(Protocol):
-    def execute(self, name: str, parameters: dict[str, Any]) -> ToolOutput: ...
+    def execute(self, name: str, args: dict[str, Any]) -> ToolOutput: ...
 
 
 class ControlledInvocation(BaseModel):
@@ -101,6 +101,9 @@ class ControlledAdapterRuntime:
     The executor may call OS-facing adapters, but this runtime owns the
     deterministic boundary around runtime constraints, output schema validation,
     redaction, and normalized failure records.
+
+    Note: network and containment checks here are deterministic/declarative
+    guardrails for v0.2; they are not a full OS-level sandbox.
     """
 
     def __init__(self, executor: CapabilityExecutor) -> None:

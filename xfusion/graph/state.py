@@ -6,9 +6,13 @@ from xfusion.domain.models.approval import ApprovalRecord
 from xfusion.domain.models.environment import EnvironmentState
 from xfusion.domain.models.execution_plan import ExecutionPlan
 from xfusion.domain.models.policy import PolicyDecision
-from xfusion.domain.models.verification import VerificationResult
+from xfusion.domain.models.verification import RepairProposal, VerificationResult
 from xfusion.planning.validator import PlanValidationResult
-from xfusion.roles.contracts import RoleContract, build_default_role_contracts
+from xfusion.roles.contracts import (
+    RoleContract,
+    RoleProposalRuntimeRecord,
+    build_default_role_contracts,
+)
 
 
 class AgentGraphState(BaseModel):
@@ -24,6 +28,8 @@ class AgentGraphState(BaseModel):
     validation_result: PlanValidationResult | None = None
     policy_decision: PolicyDecision | None = None
     verification_result: VerificationResult | None = None
+    repair_proposals: list[RepairProposal] = Field(default_factory=list)
+    active_repair_step_ids: list[str] = Field(default_factory=list)
     last_tool_output: dict[str, object] | None = None
     step_outputs: dict[str, dict[str, object]] = Field(default_factory=dict)
     authorized_step_outputs: dict[str, dict[str, object]] = Field(default_factory=dict)
@@ -35,6 +41,7 @@ class AgentGraphState(BaseModel):
             role.value: contract for role, contract in build_default_role_contracts().items()
         }
     )
+    role_runtime_records: list[RoleProposalRuntimeRecord] = Field(default_factory=list)
     response: str = ""
     audit_records: list[dict[str, object]] = Field(default_factory=list)
     audit_log_path: str | None = None

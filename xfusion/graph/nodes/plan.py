@@ -3,8 +3,9 @@ from __future__ import annotations
 import re
 import uuid
 
-from xfusion.domain.enums import InteractionState
+from xfusion.domain.enums import InteractionState, ReasoningRole
 from xfusion.domain.models.execution_plan import ExecutionPlan, PlanStep
+from xfusion.graph.roles import record_role_proposal
 from xfusion.graph.state import AgentGraphState
 
 
@@ -24,13 +25,8 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
             PlanStep(
                 step_id="explain_forbidden_permission_change",
                 intent="Explain why recursive permission changes on protected paths are forbidden.",
-                tool="plan.explain_action",
-                parameters={"path": "/usr", "action": "chmod"},
-                expected_output="Refusal explanation for protected permission change.",
-                verification_method="none",
-                success_condition="The unsafe permission change is refused.",
-                failure_condition="The permission change is allowed.",
-                fallback_action="Refuse and stop.",
+                capability="plan.explain_action",
+                args={"path": "/usr", "action": "chmod"},
             )
         )
     elif "environment" in user_input or "os" in user_input:
@@ -38,12 +34,7 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
             PlanStep(
                 step_id="detect_os",
                 intent="Detect the current Linux environment.",
-                tool="system.detect_os",
-                expected_output="Distro and version information.",
-                verification_method="state_re_read",
-                success_condition="Environment facts are populated.",
-                failure_condition="Could not detect environment.",
-                fallback_action="Report failure and stop.",
+                capability="system.detect_os",
             )
         )
     elif ("disk" in user_input and ("clean" in user_input or "full" in user_input)) or (
@@ -55,31 +46,21 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
                 PlanStep(
                     step_id="check_disk_pressure",
                     intent="Check disk pressure before cleanup.",
-                    tool="disk.check_usage",
-                    parameters={"path": "/"},
-                    expected_output="Disk usage and pressure are reported.",
-                    verification_method="state_re_read",
-                    success_condition="Disk usage is reported.",
-                    failure_condition="Could not check disk pressure.",
-                    fallback_action="Report failure and stop.",
+                    capability="disk.check_usage",
+                    args={"path": "/"},
                 ),
                 PlanStep(
                     step_id="find_large_candidates",
                     intent="Identify bounded cleanup contributors.",
-                    tool="disk.find_large_directories",
-                    parameters={"path": "/tmp", "limit": 10},
-                    dependencies=["check_disk_pressure"],
-                    expected_output="Candidate contributors are listed.",
-                    verification_method="filesystem_metadata_recheck",
-                    success_condition="Large directory scan returns bounded results.",
-                    failure_condition="Large directory scan fails.",
-                    fallback_action="Continue with safe demo-cache preview.",
+                    capability="disk.find_large_directories",
+                    args={"path": "/tmp", "limit": 10},
+                    depends_on=["check_disk_pressure"],
                 ),
                 PlanStep(
                     step_id="preview_safe_cleanup",
                     intent="Preview safe cleanup candidates.",
-                    tool="cleanup.safe_disk_cleanup",
-                    parameters={
+                    capability="cleanup.safe_disk_cleanup",
+                    args={
                         "approved_paths": cleanup_paths,
                         "candidate_class": "demo_cache",
                         "older_than_days": 0,
@@ -87,18 +68,13 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
                         "max_bytes": 50_000_000,
                         "execute": False,
                     },
-                    dependencies=["find_large_candidates"],
-                    expected_output="Bounded cleanup candidates are previewed.",
-                    verification_method="filesystem_metadata_recheck",
-                    success_condition="Cleanup candidates are previewed before deletion.",
-                    failure_condition="Cleanup candidates cannot be previewed safely.",
-                    fallback_action="Report failure and stop.",
+                    depends_on=["find_large_candidates"],
                 ),
                 PlanStep(
                     step_id="execute_safe_cleanup",
                     intent="Delete only approved previewed cleanup candidates.",
-                    tool="cleanup.safe_disk_cleanup",
-                    parameters={
+                    capability="cleanup.safe_disk_cleanup",
+                    args={
                         "approved_paths": cleanup_paths,
                         "candidate_class": "demo_cache",
                         "older_than_days": 0,
@@ -106,25 +82,15 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
                         "max_bytes": 50_000_000,
                         "execute": True,
                     },
-                    dependencies=["preview_safe_cleanup"],
-                    expected_output="Approved cleanup candidates are deleted.",
-                    verification_method="command_exit_status_plus_state",
-                    success_condition="Cleanup reports deleted candidates or safe no-op.",
-                    failure_condition="Cleanup execution fails.",
-                    fallback_action="Abort and preserve remaining files.",
+                    depends_on=["preview_safe_cleanup"],
                     verification_step_ids=["verify_disk_after_cleanup"],
                 ),
                 PlanStep(
                     step_id="verify_disk_after_cleanup",
                     intent="Verify disk state after cleanup.",
-                    tool="disk.check_usage",
-                    parameters={"path": "/"},
-                    dependencies=["execute_safe_cleanup"],
-                    expected_output="Disk usage is re-read after cleanup.",
-                    verification_method="state_re_read",
-                    success_condition="Disk usage is reported after cleanup.",
-                    failure_condition="Could not verify disk state after cleanup.",
-                    fallback_action="Report cleanup result with verification warning.",
+                    capability="disk.check_usage",
+                    args={"path": "/"},
+                    depends_on=["execute_safe_cleanup"],
                 ),
             ]
         )
@@ -133,13 +99,8 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
             PlanStep(
                 step_id="check_disk",
                 intent="Check the current disk usage.",
-                tool="disk.check_usage",
-                parameters={"path": "/"},
-                expected_output="Disk usage report for root filesystem.",
-                verification_method="state_re_read",
-                success_condition="Disk usage is reported.",
-                failure_condition="Could not check disk usage.",
-                fallback_action="Report failure and stop.",
+                capability="disk.check_usage",
+                args={"path": "/"},
             )
         )
     elif "ram" in user_input or "memory" in user_input:
@@ -147,13 +108,8 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
             PlanStep(
                 step_id="check_ram",
                 intent="Check the current RAM usage.",
-                tool="system.check_ram",
-                parameters={},
-                expected_output="RAM usage report.",
-                verification_method="state_re_read",
-                success_condition="RAM usage is reported.",
-                failure_condition="Could not check RAM usage.",
-                fallback_action="Report failure and stop.",
+                capability="system.check_ram",
+                args={},
             )
         )
     elif "preview metadata for" in user_input:
@@ -162,13 +118,8 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
             PlanStep(
                 step_id="preview_metadata",
                 intent=f"Preview metadata for {path}.",
-                tool="file.preview_metadata",
-                parameters={"path": path},
-                expected_output="Path metadata without file contents.",
-                verification_method="filesystem_metadata_recheck",
-                success_condition="Metadata preview returns existence and path facts.",
-                failure_condition="Metadata preview fails.",
-                fallback_action="Ask for an exact path.",
+                capability="file.preview_metadata",
+                args={"path": path},
             )
         )
     elif "search for" in user_input or "find files named" in user_input:
@@ -178,13 +129,8 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
             PlanStep(
                 step_id="search_files",
                 intent=f"Search for files matching {query}.",
-                tool="file.search",
-                parameters={"query": query, "path": ".", "limit": 20},
-                expected_output="Limited file search results.",
-                verification_method="filesystem_metadata_recheck",
-                success_condition="Search results are returned within the configured limit.",
-                failure_condition="Search fails or returns an unbounded result set.",
-                fallback_action="Ask the user to narrow the search.",
+                capability="file.search",
+                args={"query": query, "path": ".", "limit": 20},
             )
         )
     elif "list processes" in user_input:
@@ -192,13 +138,8 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
             PlanStep(
                 step_id="list_processes",
                 intent="List running processes.",
-                tool="process.list",
-                parameters={"limit": 20},
-                expected_output="Bounded process listing.",
-                verification_method="command_exit_status_plus_state",
-                success_condition="A bounded process list is returned.",
-                failure_condition="Process list cannot be read.",
-                fallback_action="Report failure and stop.",
+                capability="process.list",
+                args={"limit": 20},
             )
         )
     elif "port" in user_input and not any(word in user_input for word in ("stop", "kill")):
@@ -209,13 +150,8 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
             PlanStep(
                 step_id="find_process",
                 intent=f"Find processes listening on port {port}.",
-                tool="process.find_by_port",
-                parameters={"port": port},
-                expected_output=f"List of PIDs on port {port}.",
-                verification_method="port_process_recheck",
-                success_condition=f"Port {port} state is reported.",
-                failure_condition=f"Port {port} lookup fails.",
-                fallback_action="Report the port state and stop.",
+                capability="process.find_by_port",
+                args={"port": port},
             )
         )
     elif "port" in user_input:
@@ -226,13 +162,8 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
             PlanStep(
                 step_id="find_process",
                 intent=f"Find processes listening on port {port}.",
-                tool="process.find_by_port",
-                parameters={"port": port},
-                expected_output=f"List of PIDs on port {port}.",
-                verification_method="port_process_recheck",
-                success_condition=f"Port {port} activity is identified.",
-                failure_condition=f"No process found on port {port}.",
-                fallback_action="Stop as there is nothing to kill.",
+                capability="process.find_by_port",
+                args={"port": port},
             )
         )
 
@@ -240,14 +171,9 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
             PlanStep(
                 step_id="kill_process",
                 intent=f"Stop the process found on port {port}.",
-                tool="process.kill",
-                parameters={"pid": "$steps.find_process.outputs.pids[0]", "port": port},
-                dependencies=["find_process"],
-                expected_output=f"Process on port {port} is stopped.",
-                verification_method="command_exit_status_plus_state",
-                success_condition=f"Process on port {port} is killed.",
-                failure_condition=f"Process on port {port} is still running.",
-                fallback_action="stop",
+                capability="process.kill",
+                args={"pid": "$steps.find_process.outputs.pids[0]", "port": port},
+                depends_on=["find_process"],
                 verification_step_ids=["verify_port_free"],
             )
         )
@@ -256,14 +182,9 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
             PlanStep(
                 step_id="verify_port_free",
                 intent=f"Final verification that port {port} is free.",
-                tool="process.find_by_port",
-                parameters={"port": port, "expect_free": True},
-                dependencies=["kill_process"],
-                expected_output=f"Port {port} is confirmed free.",
-                verification_method="port_process_recheck",
-                success_condition=f"Port {port} is free.",
-                failure_condition=f"Port {port} is unexpectedly busy.",
-                fallback_action="stop",
+                capability="process.find_by_port",
+                args={"port": port, "expect_free": True},
+                depends_on=["kill_process"],
             )
         )
     elif "create user" in user_input:
@@ -272,13 +193,8 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
             PlanStep(
                 step_id="create_user",
                 intent=f"Create normal user {username}.",
-                tool="user.create",
-                parameters={"username": username},
-                expected_output=f"User {username} exists.",
-                verification_method="existence_nonexistence_check",
-                success_condition=f"User {username} exists after creation.",
-                failure_condition=f"User {username} does not exist after creation.",
-                fallback_action="Report failure and stop.",
+                capability="user.create",
+                args={"username": username},
             )
         )
     elif "delete user" in user_input or "remove user" in user_input:
@@ -287,13 +203,8 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
             PlanStep(
                 step_id="delete_user",
                 intent=f"Delete user {username}.",
-                tool="user.delete",
-                parameters={"username": username},
-                expected_output=f"User {username} is absent.",
-                verification_method="existence_nonexistence_check",
-                success_condition=f"User {username} is absent after deletion.",
-                failure_condition=f"User {username} still exists after deletion.",
-                fallback_action="Report failure and stop.",
+                capability="user.delete",
+                args={"username": username},
             )
         )
     elif "delete that file" in user_input:
@@ -306,13 +217,8 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
             PlanStep(
                 step_id="delete_path",
                 intent=f"Delete everything in {path}.",
-                tool="cleanup.safe_disk_cleanup",  # Using cleanup tool as a placeholder
-                parameters={"path": path},
-                expected_output=f"{path} is deleted.",
-                verification_method="existence_nonexistence_check",
-                success_condition=f"{path} no longer exists.",
-                failure_condition=f"{path} still exists.",
-                fallback_action="stop",
+                capability="cleanup.safe_disk_cleanup",
+                args={"path": path},
             )
         )
 
@@ -340,6 +246,14 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
             clarification_question=clarification,
         )
         state.response = clarification
+        record_role_proposal(
+            state,
+            role=ReasoningRole.SUPERVISOR,
+            proposal_type="clarification",
+            payload={"question": clarification},
+            deterministic_layer="plan_node",
+            consumes_redacted_inputs_only=True,
+        )
         return state
 
     mutating_tools = {
@@ -350,7 +264,7 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
     }
     verification_strategy = (
         "Verify mutating workflow outcomes with planned post-action checks."
-        if any(step.tool in mutating_tools for step in steps)
+        if any(step.capability in mutating_tools for step in steps)
         else None
     )
 
@@ -361,5 +275,46 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
         interaction_state=InteractionState.EXECUTING,
         steps=steps,
         verification_strategy=verification_strategy,
+    )
+
+    read_only_capabilities = {
+        "system.current_user",
+        "system.detect_os",
+        "disk.check_usage",
+        "process.find_by_port",
+        "file.preview_metadata",
+        "file.search",
+        "process.list",
+    }
+    observation_capabilities = [
+        step.capability for step in steps if step.capability in read_only_capabilities
+    ]
+    record_role_proposal(
+        state,
+        role=ReasoningRole.OBSERVATION,
+        proposal_type="tier_0_capability",
+        payload={"capabilities": observation_capabilities, "risk_tier": "tier_0"},
+        deterministic_layer="plan_node",
+        consumes_redacted_inputs_only=True,
+    )
+    record_role_proposal(
+        state,
+        role=ReasoningRole.DIAGNOSIS,
+        proposal_type="hypothesis",
+        payload={"summary": "Deterministic planner selected bounded capabilities for the request."},
+        deterministic_layer="plan_node",
+        consumes_redacted_inputs_only=True,
+    )
+    record_role_proposal(
+        state,
+        role=ReasoningRole.PLANNING,
+        proposal_type="workflow_dag",
+        payload={
+            "plan_id": state.plan.plan_id,
+            "step_ids": [step.step_id for step in state.plan.steps],
+            "verification_strategy": state.plan.verification_strategy,
+        },
+        deterministic_layer="plan_node",
+        consumes_redacted_inputs_only=True,
     )
     return state

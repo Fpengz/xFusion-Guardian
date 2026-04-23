@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from xfusion.capabilities.registry import build_default_capability_registry
-from xfusion.domain.enums import InteractionState
+from xfusion.domain.enums import InteractionState, ReasoningRole
 from xfusion.graph.auditing import log_graph_event
+from xfusion.graph.roles import record_role_proposal
 from xfusion.graph.state import AgentGraphState
 from xfusion.planning.validator import validate_plan
 
@@ -17,6 +18,18 @@ def validate_node(state: AgentGraphState) -> AgentGraphState:
 
     result = validate_plan(state.plan, build_default_capability_registry())
     state.validation_result = result
+    record_role_proposal(
+        state,
+        role=ReasoningRole.SUPERVISOR,
+        proposal_type="coordination",
+        payload={
+            "validation_valid": result.valid,
+            "error_codes": [error.code for error in result.errors],
+        },
+        deterministic_layer="validate_node",
+        attributable_step_id=state.current_step_id,
+        consumes_redacted_inputs_only=True,
+    )
 
     if result.valid:
         return state

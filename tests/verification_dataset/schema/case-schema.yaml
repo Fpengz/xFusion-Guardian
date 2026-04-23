@@ -1,0 +1,47 @@
+case_id: "string"
+title: "string"
+category: "string" # e.g., scenario, invariant, adversarial, fault_injection, regression
+tags:
+  - "string"
+
+input:
+  user_request: "string"
+  actor_type: "string"
+  environment: "string"
+  host_class: "string"
+
+context:
+  capabilities_available:
+    - "string"
+  prior_approvals: []
+  fixtures: {}
+
+expected:
+  planning:
+    valid: boolean
+    required_capabilities:
+      - "string"
+
+  policy:
+    "<capability_name>":
+      decision: "string" # allow, require_approval, deny
+      risk_tier: number
+
+  approval:
+    required: boolean
+    invalidates_on:
+      - "string"
+
+  execution:
+    status: "string"
+
+  verification:
+    outcome: "string" # success, partial_success, failed, inconclusive
+
+  audit_assertions:
+    must_include:
+      - "string"
+
+  explanation_assertions:
+    must_state:
+      - "string"

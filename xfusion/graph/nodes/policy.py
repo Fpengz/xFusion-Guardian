@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from xfusion.capabilities.registry import build_default_capability_registry
-from xfusion.domain.enums import InteractionState, PolicyDecisionValue, StepStatus
+from xfusion.domain.enums import InteractionState, PolicyDecisionValue, ReasoningRole, StepStatus
 from xfusion.graph.auditing import log_graph_event
+from xfusion.graph.roles import record_role_proposal
 from xfusion.graph.state import AgentGraphState
 from xfusion.planning.reference_resolver import resolve_args
 from xfusion.policy.approval import (
@@ -74,6 +75,20 @@ def policy_node(state: AgentGraphState) -> AgentGraphState:
     )
 
     state.policy_decision = decision
+    record_role_proposal(
+        state,
+        role=ReasoningRole.SUPERVISOR,
+        proposal_type="coordination",
+        payload={
+            "step_id": step.step_id,
+            "policy_decision": decision.decision.value,
+            "risk_tier": decision.risk_tier.value,
+            "approval_mode": decision.approval_mode.value,
+        },
+        deterministic_layer="policy_node",
+        attributable_step_id=step.step_id,
+        consumes_redacted_inputs_only=True,
+    )
 
     step.risk_level = decision.risk_level
     step.requires_confirmation = decision.requires_approval

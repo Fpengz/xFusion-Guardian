@@ -15,8 +15,8 @@ class StubRegistry:
         self.output = output
         self.calls: list[tuple[str, dict[str, object]]] = []
 
-    def execute(self, name: str, parameters: dict[str, object]) -> ToolOutput:
-        self.calls.append((name, parameters))
+    def execute(self, name: str, args: dict[str, object]) -> ToolOutput:
+        self.calls.append((name, args))
         return self.output
 
 
@@ -38,13 +38,9 @@ def test_tool_success_can_still_fail_verification() -> None:
     step = PlanStep(
         step_id="verify_port",
         intent="Verify port is free",
-        tool="process.find_by_port",
-        parameters={"port": 8080},
-        expected_output="Port is free.",
-        verification_method="port_recheck",
-        success_condition="No PIDs are listening.",
-        failure_condition="A PID is still listening.",
-        fallback_action="abort",
+        capability="process.find_by_port",
+        args={"port": 8080, "expect_free": True},
+        on_failure="abort",
     )
     state = make_state(step)
 
@@ -68,13 +64,9 @@ def test_yes_is_rejected_for_risky_confirmation() -> None:
     step = PlanStep(
         step_id="kill_process",
         intent="Kill process",
-        tool="process.kill",
-        parameters={"pid": 1234},
-        expected_output="Killed",
-        verification_method="tool_success",
-        success_condition="Signal sent.",
-        failure_condition="Signal failed.",
-        fallback_action="abort",
+        capability="process.kill",
+        args={"pid": 1234},
+        on_failure="abort",
         requires_confirmation=True,
         confirmation_phrase="I understand the risks of Kill process",
     )
@@ -95,13 +87,9 @@ def test_exact_confirmation_phrase_succeeds_and_clears_once() -> None:
     step = PlanStep(
         step_id="kill_process",
         intent="Kill process",
-        tool="process.kill",
-        parameters={"pid": 1234},
-        expected_output="Killed",
-        verification_method="tool_success",
-        success_condition="Signal sent.",
-        failure_condition="Signal failed.",
-        fallback_action="abort",
+        capability="process.kill",
+        args={"pid": 1234},
+        on_failure="abort",
         requires_confirmation=True,
         confirmation_phrase=phrase,
     )
@@ -123,13 +111,9 @@ def test_confirmation_does_not_persist_across_plans() -> None:
     first_step = PlanStep(
         step_id="kill_process",
         intent="Kill process",
-        tool="process.kill",
-        parameters={"pid": 1234},
-        expected_output="Killed",
-        verification_method="tool_success",
-        success_condition="Signal sent.",
-        failure_condition="Signal failed.",
-        fallback_action="abort",
+        capability="process.kill",
+        args={"pid": 1234},
+        on_failure="abort",
         requires_confirmation=True,
         confirmation_phrase=phrase,
     )
@@ -142,13 +126,9 @@ def test_confirmation_does_not_persist_across_plans() -> None:
     second_step = PlanStep(
         step_id="kill_again",
         intent="Kill another process",
-        tool="process.kill",
-        parameters={"pid": 5678},
-        expected_output="Killed",
-        verification_method="tool_success",
-        success_condition="Signal sent.",
-        failure_condition="Signal failed.",
-        fallback_action="abort",
+        capability="process.kill",
+        args={"pid": 5678},
+        on_failure="abort",
         requires_confirmation=True,
     )
     state.user_input = phrase

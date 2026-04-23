@@ -86,13 +86,9 @@ def test_smoke_confirmation_flow():
             PlanStep(
                 step_id="kill_it",
                 intent="Kill the process",
-                tool="process.kill",
-                parameters={"pid": 1234},
-                expected_output="Killed",
-                verification_method="recheck",
-                success_condition="gone",
-                failure_condition="still there",
-                fallback_action="stop",
+                capability="process.kill",
+                args={"pid": 1234},
+                on_failure="stop",
             )
         ],
     )
