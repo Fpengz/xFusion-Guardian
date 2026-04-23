@@ -34,18 +34,8 @@ class PolicyDecision(BaseModel):
         return self.decision == PolicyDecisionValue.DENY
 
     @property
-    def allowed(self) -> bool:
-        """Transitional read-only compatibility view; not part of model_dump()."""
-        return self.decision in {PolicyDecisionValue.ALLOW, PolicyDecisionValue.REQUIRE_APPROVAL}
-
-    @property
-    def requires_confirmation(self) -> bool:
-        """Transitional read-only compatibility view; v0.2 callers use requires_approval."""
-        return self.requires_approval
-
-    @property
     def risk_level(self) -> RiskLevel:
-        """Transitional v0.1 label for old verification-suite expectations."""
+        """Derived convenience mapping used by graph flow and tests."""
         return {
             RiskTier.TIER_0: RiskLevel.LOW,
             RiskTier.TIER_1: RiskLevel.MEDIUM,

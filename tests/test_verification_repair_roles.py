@@ -20,8 +20,8 @@ class OutputRegistry:
         self.outputs = outputs
         self.executed_tools: list[str] = []
 
-    def execute(self, name: str, parameters: dict[str, object]) -> ToolOutput:
-        del parameters
+    def execute(self, name: str, args: dict[str, object]) -> ToolOutput:
+        del args
         self.executed_tools.append(name)
         return ToolOutput(summary="adapter returned test output", data=self.outputs[name])
 
@@ -75,15 +75,12 @@ def test_failed_verification_produces_typed_repair_with_audit_lineage() -> None:
         language="en",
         steps=[
             PlanStep(
-                id="verify_port",
+                step_id="verify_port",
                 capability="process.find_by_port",
                 args={"port": 8080, "expect_free": True},
                 expected_outputs={"pids": "array"},
                 justification="Verify the port is free.",
-                verification_method="port_process_recheck",
-                success_condition="Port is free.",
-                failure_condition="Port remains occupied.",
-                fallback_action="stop",
+                on_failure="stop",
             )
         ],
     )
@@ -114,20 +111,17 @@ def test_term_to_kill_escalation_requires_new_reapproval_and_reentry() -> None:
         language="en",
         steps=[
             PlanStep(
-                id="kill",
+                step_id="kill",
                 capability="process.kill",
                 args={"pid": 1234, "signal": "TERM"},
                 expected_outputs={"ok": "boolean"},
                 justification="Stop bounded process.",
-                verification_method="existence_nonexistence_check",
-                success_condition="Target absence confirmed.",
-                failure_condition="Target still appears to exist.",
-                fallback_action="stop",
+                on_failure="stop",
             )
         ],
         verification_strategy="verify kill result",
     )
-    registry = OutputRegistry({"process.kill": {"ok": True, "pid": 1234, "signal": "TERM"}})
+    registry = OutputRegistry({"process.kill": {"ok": False, "pid": 1234, "signal": "TERM"}})
     graph = build_agent_graph(registry).compile()
 
     state = graph.invoke(_state(plan, user_input="stop pid 1234"))
@@ -155,21 +149,18 @@ def test_target_change_after_failed_verification_invalidates_reused_approval() -
         language="en",
         steps=[
             PlanStep(
-                id="kill",
+                step_id="kill",
                 capability="process.kill",
                 args={"pid": 1234, "signal": "KILL"},
                 expected_outputs={"ok": "boolean"},
                 justification="Stop bounded process.",
-                verification_method="existence_nonexistence_check",
-                success_condition="Target absence confirmed.",
-                failure_condition="Target still appears to exist.",
-                fallback_action="stop",
+                on_failure="stop",
             )
         ],
         verification_strategy="verify kill result",
         approval_summary={"allow_equivalent_repair_approval_reuse": True},
     )
-    registry = OutputRegistry({"process.kill": {"ok": True, "pid": 1234, "signal": "KILL"}})
+    registry = OutputRegistry({"process.kill": {"ok": False, "pid": 1234, "signal": "KILL"}})
     graph = build_agent_graph(registry).compile()
 
     state = graph.invoke(_state(plan, user_input="force stop"))
@@ -181,7 +172,7 @@ def test_target_change_after_failed_verification_invalidates_reused_approval() -
 
     repair_step.status = StepStatus.PENDING
     repair_step.args = {"pid": 9999, "signal": "KILL"}
-    repair_step.parameters = {"pid": 9999, "signal": "KILL"}
+    repair_step.args = {"pid": 9999, "signal": "KILL"}
     state["plan"].interaction_state = InteractionState.EXECUTING
     state["plan"].status = "executing"
 
@@ -197,15 +188,13 @@ def test_inconclusive_verification_is_never_promoted_to_success() -> None:
         language="en",
         steps=[
             PlanStep(
-                id="whoami",
+                step_id="whoami",
                 capability="system.current_user",
                 args={},
                 expected_outputs={"username": "string"},
                 justification="Read current user.",
-                verification_method="unknown_method",
-                success_condition="User was returned.",
-                failure_condition="User unavailable.",
-                fallback_action="stop",
+                on_failure="stop",
+                verification_method="mystery_mode",
             )
         ],
     )

@@ -34,7 +34,8 @@ SECRET = "password=supersecret token=abcdef1234567890"
 
 
 class RaisingRegistry:
-    def execute(self, name: str, parameters: dict[str, object]) -> ToolOutput:
+    def execute(self, name: str, args: dict[str, object]) -> ToolOutput:
+        del args
         raise RuntimeError(f"adapter blew up with {SECRET}")
 
 
@@ -42,7 +43,8 @@ class TimeoutRegistry:
     def __init__(self) -> None:
         self.executed_tools: list[str] = []
 
-    def execute(self, name: str, parameters: dict[str, object]) -> ToolOutput:
+    def execute(self, name: str, args: dict[str, object]) -> ToolOutput:
+        del args
         self.executed_tools.append(name)
         raise TimeoutError(f"runtime exceeded limit while handling {SECRET}")
 
@@ -51,7 +53,7 @@ class BrokenReturnRegistry:
     def __init__(self) -> None:
         self.executed_tools: list[str] = []
 
-    def execute(self, name: str, parameters: dict[str, object]) -> object:
+    def execute(self, name: str, args: dict[str, object]) -> object:
         self.executed_tools.append(name)
         return object()
 
@@ -61,7 +63,7 @@ class OutputRegistry:
         self.outputs = outputs
         self.executed_tools: list[str] = []
 
-    def execute(self, name: str, parameters: dict[str, object]) -> ToolOutput:
+    def execute(self, name: str, args: dict[str, object]) -> ToolOutput:
         self.executed_tools.append(name)
         return ToolOutput(summary="adapter returned test output", data=self.outputs[name])
 
@@ -75,56 +77,15 @@ class FakeRunner(CommandRunner):
         return CommandResult(stdout="operator\n", stderr="", exit_code=0)
 
 
-def test_plan_step_rejects_conflicting_v02_and_legacy_execution_surfaces() -> None:
-    with pytest.raises(ValidationError, match="Conflicting capability/tool"):
+def test_plan_step_rejects_extra_fields() -> None:
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         PlanStep.model_validate(
             {
-                "id": "confused",
+                "step_id": "bad",
+                "intent": "bad",
                 "capability": "process.kill",
-                "tool": "system.current_user",
-                "args": {"pid": 1234, "signal": "TERM"},
-                "parameters": {},
-                "expected_outputs": {"ok": "boolean"},
-                "justification": "Conflicting surfaces must fail closed.",
-                "verification_method": "command_exit_status_plus_state",
-                "success_condition": "Process stopped.",
-                "failure_condition": "Process still running.",
-                "fallback_action": "stop",
-            }
-        )
-
-
-def test_plan_step_rejects_conflicting_v02_and_legacy_argument_surfaces() -> None:
-    with pytest.raises(ValidationError, match="Conflicting args/parameters"):
-        PlanStep.model_validate(
-            {
-                "id": "confused",
-                "capability": "process.kill",
-                "args": {"pid": 1234, "signal": "TERM"},
-                "parameters": {"pid": 9999, "signal": "TERM"},
-                "expected_outputs": {"ok": "boolean"},
-                "justification": "Conflicting arguments must fail closed.",
-                "verification_method": "command_exit_status_plus_state",
-                "success_condition": "Process stopped.",
-                "failure_condition": "Process still running.",
-                "fallback_action": "stop",
-            }
-        )
-
-
-def test_plan_step_rejects_legacy_only_execution_surface() -> None:
-    with pytest.raises(ValidationError, match="Legacy tool field without canonical capability"):
-        PlanStep.model_validate(
-            {
-                "id": "legacy-only",
-                "tool": "process.kill",
-                "parameters": {"pid": 1234, "signal": "TERM"},
-                "expected_outputs": {"ok": "boolean"},
-                "justification": "Legacy-only execution surface is forbidden.",
-                "verification_method": "command_exit_status_plus_state",
-                "success_condition": "Process stopped.",
-                "failure_condition": "Process still running.",
-                "fallback_action": "stop",
+                "args": {},
+                "truly_unknown_field": "fail",
             }
         )
 
@@ -150,27 +111,21 @@ def test_legacy_ref_dict_is_rejected_by_static_validation_and_resolver() -> None
         language="en",
         steps=[
             PlanStep(
-                id="find",
+                step_id="find",
                 capability="process.find_by_port",
                 args={"port": 8080},
                 expected_outputs={"pids": "array"},
                 justification="Find process.",
-                verification_method="port_process_recheck",
-                success_condition="Port state is reported.",
-                failure_condition="Port lookup fails.",
-                fallback_action="stop",
+                on_failure="stop",
             ),
             PlanStep(
-                id="kill",
+                step_id="kill",
                 capability="process.kill",
                 args={"pid": {"ref": "find.pids[0]"}, "signal": "TERM"},
                 depends_on=["find"],
                 expected_outputs={"ok": "boolean"},
                 justification="Stop process.",
-                verification_method="command_exit_status_plus_state",
-                success_condition="Process stopped.",
-                failure_condition="Process still running.",
-                fallback_action="stop",
+                on_failure="stop",
             ),
         ],
         verification_strategy="legacy references are unsafe",
@@ -196,15 +151,12 @@ def test_reference_resolution_requires_authorized_outputs_mapping() -> None:
         language="en",
         steps=[
             PlanStep(
-                id="find",
+                step_id="find",
                 capability="process.find_by_port",
                 args={"port": 8080},
                 expected_outputs={"pids": "array"},
                 justification="Find process.",
-                verification_method="port_process_recheck",
-                success_condition="Port state is reported.",
-                failure_condition="Port lookup fails.",
-                fallback_action="stop",
+                on_failure="stop",
             )
         ],
     )
@@ -228,26 +180,20 @@ def test_static_validator_rejects_enum_and_range_violations() -> None:
         language="en",
         steps=[
             PlanStep(
-                id="find",
+                step_id="find",
                 capability="process.find_by_port",
                 args={"port": 70000},
                 expected_outputs={"pids": "array"},
                 justification="Invalid port must fail schema validation.",
-                verification_method="port_process_recheck",
-                success_condition="Port state is reported.",
-                failure_condition="Port lookup fails.",
-                fallback_action="stop",
+                on_failure="stop",
             ),
             PlanStep(
-                id="kill",
+                step_id="kill",
                 capability="process.kill",
                 args={"pid": 1234, "signal": "HUP"},
                 expected_outputs={"ok": "boolean"},
                 justification="Invalid signal must fail schema validation.",
-                verification_method="command_exit_status_plus_state",
-                success_condition="Process stopped.",
-                failure_condition="Process still running.",
-                fallback_action="stop",
+                on_failure="stop",
             ),
         ],
         verification_strategy="invalid args do not execute",
@@ -492,27 +438,21 @@ def test_malformed_output_is_audited_and_never_becomes_referenceable() -> None:
         language="en",
         steps=[
             PlanStep(
-                id="find",
+                step_id="find",
                 capability="process.find_by_port",
                 args={"port": 8080},
                 expected_outputs={"pids": "array"},
                 justification="Find process.",
-                verification_method="port_process_recheck",
-                success_condition="Port state is reported.",
-                failure_condition="Port lookup fails.",
-                fallback_action="stop",
+                on_failure="stop",
             ),
             PlanStep(
-                id="kill",
+                step_id="kill",
                 capability="process.kill",
                 args={"pid": "$steps.find.outputs.pids[0]", "signal": "TERM"},
                 depends_on=["find"],
                 expected_outputs={"ok": "boolean"},
                 justification="Stop process from prior output.",
-                verification_method="command_exit_status_plus_state",
-                success_condition="Process stopped.",
-                failure_condition="Process still running.",
-                fallback_action="stop",
+                on_failure="stop",
             ),
         ],
         verification_strategy="verify process stop",
@@ -582,15 +522,12 @@ def _current_user_plan(plan_id: str) -> ExecutionPlan:
         language="en",
         steps=[
             PlanStep(
-                id="whoami",
+                step_id="whoami",
                 capability="system.current_user",
                 args={},
                 expected_outputs={"username": "string"},
                 justification="Read current user.",
-                verification_method="state_re_read",
-                success_condition="User is returned.",
-                failure_condition="User is unavailable.",
-                fallback_action="stop",
+                on_failure="stop",
             )
         ],
     )
@@ -657,15 +594,12 @@ def test_scope_violation_fails_closed_end_to_end() -> None:
         language="en",
         steps=[
             PlanStep(
-                id="cleanup",
+                step_id="cleanup",
                 capability="cleanup.safe_disk_cleanup",
                 args={"approved_paths": ["/etc"], "execute": True},
                 expected_outputs={"ok": "boolean"},
                 justification="Protected path mutation must fail closed.",
-                verification_method="filesystem_metadata_recheck",
-                success_condition="Cleanup is bounded.",
-                failure_condition="Protected path was touched.",
-                fallback_action="stop",
+                on_failure="stop",
             )
         ],
         verification_strategy="protected path denial",
@@ -715,15 +649,12 @@ def test_policy_denial_emits_structured_audit_record() -> None:
         language="en",
         steps=[
             PlanStep(
-                id="deny",
+                step_id="deny",
                 capability="plan.explain_action",
                 args={"path": "/etc", "action": "delete"},
                 expected_outputs={"reason": "string"},
                 justification="Unsafe action should be denied.",
-                verification_method="none",
-                success_condition="Denied.",
-                failure_condition="Allowed.",
-                fallback_action="stop",
+                on_failure="stop",
             )
         ],
     )
@@ -760,15 +691,12 @@ def test_verification_failure_emits_audit_record_from_authoritative_state() -> N
         language="en",
         steps=[
             PlanStep(
-                id="verify_port",
+                step_id="verify_port",
                 capability="process.find_by_port",
                 args={"port": 8080, "expect_free": True},
                 expected_outputs={"pids": "array"},
                 justification="Check port.",
-                verification_method="port_process_recheck",
-                success_condition="Port is free.",
-                failure_condition="Port is occupied.",
-                fallback_action="stop",
+                on_failure="stop",
             )
         ],
     )
@@ -806,15 +734,12 @@ def test_approval_invalidation_emits_audit_and_blocks_reuse() -> None:
         language="en",
         steps=[
             PlanStep(
-                id="kill",
+                step_id="kill",
                 capability="process.kill",
                 args={"pid": 1234, "signal": "TERM"},
                 expected_outputs={"ok": "boolean"},
                 justification="Stop bounded process.",
-                verification_method="command_exit_status_plus_state",
-                success_condition="Process stopped.",
-                failure_condition="Process still running.",
-                fallback_action="stop",
+                on_failure="stop",
             )
         ],
         verification_strategy="verify process stop",
@@ -843,7 +768,7 @@ def test_approval_invalidation_emits_audit_and_blocks_reuse() -> None:
 
     state["plan"].steps[0].status = StepStatus.PENDING
     state["plan"].steps[0].args = {"pid": 9999, "signal": "TERM"}
-    state["plan"].steps[0].parameters = {"pid": 9999, "signal": "TERM"}
+    state["plan"].steps[0].args = {"pid": 9999, "signal": "TERM"}
     state["plan"].interaction_state = InteractionState.EXECUTING
     state["plan"].status = "executing"
     state = graph.invoke(state)

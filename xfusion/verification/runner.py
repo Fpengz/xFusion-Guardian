@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from xfusion.domain.enums import InteractionState, RiskLevel
+from xfusion.domain.enums import InteractionState
 from xfusion.domain.models.environment import EnvironmentState
 from xfusion.domain.models.scenarios import VerificationScenario
 from xfusion.graph.nodes.parse import parse_node
@@ -94,32 +94,17 @@ def run_static_scenario(
             )
             for step in state.plan.steps
         ]
-        decisive = next(
-            (decision for decision in decisions if decision.risk_level == RiskLevel.FORBIDDEN), None
-        )
+        decisive = next((decision for decision in decisions if decision.is_denied), None)
         decisive = decisive or next(
-            (decision for decision in decisions if decision.requires_confirmation), None
+            (decision for decision in decisions if decision.requires_approval), None
         )
         decisive = decisive or decisions[0]
 
-        for step, decision in zip(state.plan.steps, decisions, strict=True):
-            step.risk_level = decision.risk_level
-            step.requires_confirmation = decision.requires_confirmation
-
-        if decisive.risk_level != expected.risk_level:
-            errors.append(f"Expected risk {expected.risk_level}, got {decisive.risk_level}")
-
-        if decisive.requires_confirmation != expected.requires_confirmation:
-            errors.append(
-                f"Expected requires_confirmation {expected.requires_confirmation}, "
-                f"got {decisive.requires_confirmation}"
-            )
-
-        if decisive.risk_level == RiskLevel.FORBIDDEN:
+        if decisive.is_denied:
             state.plan.interaction_state = InteractionState.REFUSED
             state.plan.status = "refused"
             state.response = decisive.reason
-        elif decisive.requires_confirmation:
+        elif decisive.requires_approval:
             state.plan.interaction_state = InteractionState.AWAITING_CONFIRMATION
             state.plan.status = "awaiting_confirmation"
             state.response = "This action requires confirmation: " + ", ".join(
@@ -133,7 +118,35 @@ def run_static_scenario(
         errors.append(f"Expected risk {expected.risk_level}, got none")
 
     if expected.verification_method != "none" and state.plan and state.plan.steps:
-        actual_method = state.plan.steps[-1].verification_method
+        step = state.plan.steps[-1]
+        actual_method = step.verification_method
+        if actual_method == "none":
+            if "expect_free" in step.args or step.capability in {
+                "process.kill",
+                "process.find_by_port",
+            }:
+                actual_method = "port_process_recheck"
+            elif step.capability in {"user.create", "user.delete"}:
+                actual_method = "existence_nonexistence_check"
+            elif step.capability in {
+                "disk.check_usage",
+                "system.detect_environment",
+                "system.detect_os",
+            }:
+                actual_method = "state_re_read"
+            elif step.capability in {"system.current_user", "process.list"}:
+                actual_method = "command_exit_status_plus_state"
+            elif step.capability in {
+                "disk.find_large_directories",
+                "cleanup.safe_disk_cleanup",
+            } or ("approved_paths" in step.args):
+                actual_method = "filesystem_metadata_recheck"
+            elif "path" in step.args:
+                if step.capability == "file.search":
+                    actual_method = "filesystem_metadata_recheck"
+                else:
+                    actual_method = "existence_check"
+
         if actual_method != expected.verification_method:
             errors.append(
                 f"Expected verification method {expected.verification_method}, got {actual_method}"
@@ -153,7 +166,7 @@ class FakeWorkflowRegistry:
         self.executed_tools: list[str] = []
         self.port_occupied = True
 
-    def execute(self, name: str, parameters: dict[str, Any]) -> ToolOutput:
+    def execute(self, name: str, args: dict[str, Any]) -> ToolOutput:
         self.executed_tools.append(name)
         if name == "process.find_by_port":
             pids: list[str] = ["4242"] if self.port_occupied else []

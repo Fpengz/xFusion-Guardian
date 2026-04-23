@@ -88,11 +88,7 @@ def test_smoke_confirmation_flow():
                 intent="Kill the process",
                 capability="process.kill",
                 args={"pid": 1234},
-                expected_output="Killed",
-                verification_method="recheck",
-                success_condition="gone",
-                failure_condition="still there",
-                fallback_action="stop",
+                on_failure="stop",
             )
         ],
     )

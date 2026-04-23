@@ -709,37 +709,15 @@ invariant-based acceptance tests.
 - Verification strategy present for every mutating workflow.
 - User-visible explanation reproducible from authoritative audit records.
 
-## Migration From v0.1
+## Migration From v0.1 (Complete)
 
-This section is explanatory and comparative. The normative source of truth for
-v0.2 behavior remains the architecture, capability, policy, approval, runtime,
-redaction, verification, repair, and audit sections above.
+This section is historical. The v0.1 to v0.2 migration is complete, and legacy
+compatibility aliases (such as `tool`, `parameters`, `id`, and `dependencies`)
+have been removed from the authoritative plan and policy models for architecture
+hygiene.
 
-Concept mapping:
-
-- v0.1 tools become v0.2 capabilities.
-- v0.1 `parameters` become schema-validated capability `args`.
-- v0.1 ad hoc output references become typed `$steps...` references.
-- v0.1 direct registry dispatch becomes controlled adapter execution.
-- v0.1 confirmation phrases become approval records bound to action
-  fingerprints.
-- v0.1 step audit expands into full-pipeline audit instrumentation.
-- v0.1 risk labels map conceptually to v0.2 tiers, but v0.2 Tier 0-3 is the
-  normative model.
-
-Required migration work:
-
-1. Introduce a capability registry with metadata and schemas.
-2. Convert the plan model from `tool + parameters` to `capability + args`.
-3. Add static plan validation and DAG/reference checks.
-4. Add two-phase capability schema validation around reference resolution.
-5. Add argument provenance records.
-6. Replace confirmation-only state with approval records and action
-   fingerprints.
-7. Route execution through controlled adapters with runtime constraints.
-8. Add deterministic secret path denial and pattern redaction.
-9. Expand audit logging from step traces to pipeline-wide records.
-10. Add scenario and invariant tests for the v0.2 acceptance criteria.
+The normative source of truth for all current behavior remains the sections
+above.
 
 ## Non-Goals
 

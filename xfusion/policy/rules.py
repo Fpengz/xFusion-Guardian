@@ -70,7 +70,11 @@ def evaluate_policy(
     prior_approval_state: dict[str, object] | None = None,
     time_quota_context: dict[str, object] | None = None,
 ) -> PolicyDecision:
-    """Return the v0.2 deterministic policy decision for a capability invocation."""
+    """Return the v0.2 deterministic policy decision for a capability invocation.
+
+    This function is authoritative for allow/require_approval/deny decisions
+    and defaults to deny when invocation inputs or matching rules are unclear.
+    """
     if not capability_name:
         return _decision(
             decision=PolicyDecisionValue.DENY,

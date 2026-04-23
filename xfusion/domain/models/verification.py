@@ -78,7 +78,11 @@ class RepairApprovalRequirement(BaseModel):
 
 
 class RepairProposal(BaseModel):
-    """Typed repair proposal linked to failed verification context."""
+    """Typed repair proposal linked to failed verification context.
+
+    Repair proposals are non-authoritative until deterministic layers validate,
+    policy-check, and approve the resulting plan steps.
+    """
 
     model_config = ConfigDict(extra="forbid")
 

@@ -1,5 +1,6 @@
 > [!IMPORTANT]
-> Historical, non-normative v0.1 material. For current behavior, use
+> Historical, non-normative v0.1 material. This document is archived for
+> historical reference only. For all current behavior, use the normative
 > [docs/specs/xfusion-v0.2.md](../../specs/xfusion-v0.2.md).
 
 # XFusion v0.1 Spec: Safety-Aware Linux Admin Agent
@@ -10,7 +11,7 @@ Build a **Python CLI chat agent** for the AI Hackathon preliminary problem: an "
 
 Use a **local Lima Ubuntu 24.04 VM** as the official demo sandbox on Apple Silicon macOS. Multipass is the fallback. Docker is development-only, not the official demo environment.
 
-Post-v0.1 architecture note: the target Pydantic v2 + LangGraph architecture is documented in [docs/architecture/pydantic-langgraph-blueprint.md](../architecture/pydantic-langgraph-blueprint.md). That blueprint is forward-looking and does not change the v0.1 baseline described here.
+Post-v0.1 architecture note: the historical Pydantic v2 + LangGraph blueprint is archived at [docs/archive/v0.1/pydantic-langgraph-blueprint.md.archived](pydantic-langgraph-blueprint.md.archived). It is retained for historical context and does not change the v0.1 baseline described here.
 
 ## Core Architecture
 

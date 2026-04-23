@@ -11,7 +11,7 @@ class MockRegistry:
         self.outputs = outputs or {}
         self.executed_tools = []
 
-    def execute(self, name, parameters):
+    def execute(self, name, args):
         self.executed_tools.append(name)
         if name == "process.find_by_port":
             return self.outputs.get(name, ToolOutput(summary="Found", data={"pids": [1234]}))
@@ -42,13 +42,13 @@ def test_3_step_port_workflow_planned():
 
     plan = result["plan"]
     assert len(plan.steps) == 3
-    assert plan.steps[0].tool == "process.find_by_port"
-    assert plan.steps[1].tool == "process.kill"
-    assert plan.steps[2].tool == "process.find_by_port"
+    assert plan.steps[0].capability == "process.find_by_port"
+    assert plan.steps[1].capability == "process.kill"
+    assert plan.steps[2].capability == "process.find_by_port"
 
-    # Check dependencies
-    assert plan.steps[1].dependencies == ["find_process"]
-    assert plan.steps[2].dependencies == ["kill_process"]
+    # Verify dependencies
+    assert plan.steps[1].depends_on == ["find_process"]
+    assert plan.steps[2].depends_on == ["kill_process"]
 
 
 def test_strict_dependency_enforcement_on_failure():

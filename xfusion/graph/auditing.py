@@ -29,7 +29,10 @@ def log_graph_event(
     action_taken: dict[str, object] | None = None,
     verification_result: dict[str, object] | None = None,
 ) -> None:
-    """Append an in-memory and optional JSONL audit event."""
+    """Append an in-memory and optional JSONL audit event.
+
+    All recorded fields are redacted before general-purpose exposure surfaces.
+    """
     if not state.plan:
         return
 
