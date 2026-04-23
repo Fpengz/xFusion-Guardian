@@ -84,7 +84,8 @@ def test_file_metadata_preview_workflow() -> None:
 
     assert state["plan"].interaction_state == InteractionState.COMPLETED
     assert [name for name, _ in registry.calls] == ["file.preview_metadata"]
-    assert "file.preview_metadata" in state["response"]
+    assert "Result:" in state["response"]
+    assert "previewed metadata" in state["response"].lower()
 
 
 def test_user_create_requires_confirmation_then_verifies() -> None:
@@ -128,7 +129,8 @@ def test_disk_pressure_wow_workflow_previews_confirms_cleans_and_verifies() -> N
     ]
     assert registry.calls[3][1]["execute"] is True
     assert registry.cleanup_executed is True
-    assert "preventive" in state["response"].lower() or "monitor" in state["response"].lower()
+    assert "Result:" in state["response"]
+    assert "Verification:" in state["response"]
 
 
 def test_cleanup_tool_previews_before_deleting_and_refuses_protected_path(tmp_path) -> None:

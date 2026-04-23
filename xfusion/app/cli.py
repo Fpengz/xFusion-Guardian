@@ -45,6 +45,7 @@ def main() -> None:
         "last_tool_output": None,
         "step_outputs": {},
         "pending_confirmation_phrase": None,
+        "response_mode": settings.response_mode,
         "response": "",
         "audit_records": [],
         "audit_log_path": settings.audit_log_path,

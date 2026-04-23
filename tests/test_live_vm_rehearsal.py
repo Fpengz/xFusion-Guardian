@@ -23,6 +23,6 @@ def test_live_vm_rehearsal_command_smoke() -> None:
     )
 
     assert result.returncode == 0
-    assert "Intent:" in result.stdout
-    assert "Verification:" in result.stdout
-    assert "Disk usage" in result.stdout
+    assert "About to run:" in result.stdout
+    assert "Ran:" in result.stdout
+    assert "What this means:" in result.stdout

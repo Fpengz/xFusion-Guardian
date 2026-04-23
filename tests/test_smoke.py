@@ -38,7 +38,7 @@ def test_smoke_disk_usage():
     result = graph.invoke(state)
 
     assert "response" in result
-    assert "Disk usage" in result["response"]
+    assert "What this means:" in result["response"]
     assert result["plan"].interaction_state == "completed"
 
 
@@ -137,7 +137,7 @@ def test_smoke_multi_turn_reset():
 
     # 1. First task
     state = graph.invoke(state)
-    assert "Disk usage" in state["response"]
+    assert "What this means:" in state["response"]
     assert state["plan"].interaction_state == "completed"
 
     # 2. Simulate CLI loop logic for reset
@@ -161,7 +161,7 @@ def test_smoke_multi_turn_reset():
     state["user_input"] = "check ram usage"
     state = graph.invoke(state)
 
-    assert "RAM usage" in state["response"]
+    assert ("What this means:" in state["response"]) or ("Result:" in state["response"])
     # Ensure previous task goal is not prepended twice or wrongly
     assert "disk usage" not in state["response"]
     assert state["plan"].goal == "check ram usage"

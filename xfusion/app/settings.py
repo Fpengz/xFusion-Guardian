@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -14,6 +15,13 @@ class Settings(BaseModel):
     llm_api_key: str | None = Field(default=None)
     llm_model: str | None = Field(default=None)
     audit_log_path: str = "audit.jsonl"
+    response_mode: Literal["normal", "debug"] = "normal"
+
+
+def _response_mode_from_env(raw: str | None) -> Literal["normal", "debug"]:
+    if raw == "debug":
+        return "debug"
+    return cast(Literal["normal", "debug"], "normal")
 
 
 def load_settings() -> Settings:
@@ -23,4 +31,5 @@ def load_settings() -> Settings:
         llm_api_key=os.environ.get("XFUSION_LLM_API_KEY"),
         llm_model=os.environ.get("XFUSION_LLM_MODEL"),
         audit_log_path=os.environ.get("XFUSION_AUDIT_LOG_PATH", "audit.jsonl"),
+        response_mode=_response_mode_from_env(os.environ.get("XFUSION_RESPONSE_MODE")),
     )

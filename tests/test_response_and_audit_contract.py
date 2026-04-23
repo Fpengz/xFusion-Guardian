@@ -35,40 +35,60 @@ def make_graph_state(user_input: str, audit_log_path: str | None = None) -> dict
         "response": "",
         "audit_records": [],
         "audit_log_path": audit_log_path,
+        "response_mode": "normal",
     }
     return graph.invoke(state)
 
 
-def assert_response_contract(response: str) -> None:
-    required_labels = [
-        "Intent:",
-        "Environment:",
-        "Plan:",
-        "Risk:",
-        "Action:",
-        "Verification:",
-        "State:",
-        "Next:",
-    ]
-    for label in required_labels:
-        assert label in response
+def assert_normal_response_contract(response: str) -> None:
+    forbidden_labels = ["Intent:", "Environment:", "Plan:", "Risk:", "Audit:", "State:"]
+    for label in forbidden_labels:
+        assert label not in response
 
 
-def test_success_response_contains_judge_contract_sections() -> None:
+def test_success_response_contains_normal_contract_sections() -> None:
     state = make_graph_state("check disk usage")
 
     assert state["plan"].interaction_state == InteractionState.COMPLETED
-    assert_response_contract(state["response"])
-    assert "disk" in state["response"].lower()
+    assert_normal_response_contract(state["response"])
+    assert "About to run:" in state["response"]
+    assert "Ran:" in state["response"]
+    assert "Output:" in state["response"]
+    assert "What this means:" in state["response"]
+    assert "Next actions:" not in state["response"]
 
 
-def test_refusal_response_contains_judge_contract_sections() -> None:
+def test_refusal_response_contains_normal_contract_sections() -> None:
     state = make_graph_state("Delete everything in /etc")
 
     assert state["plan"].interaction_state == InteractionState.REFUSED
-    assert_response_contract(state["response"])
+    assert_normal_response_contract(state["response"])
+    assert "Result:" in state["response"]
+    assert "Verification:" in state["response"]
+    assert "Next actions:" in state["response"]
     assert "/etc" in state["response"]
     assert "protected" in state["response"].lower()
+
+
+def test_debug_response_contains_internal_sections() -> None:
+    state = make_graph_state("check disk usage")
+    state["response_mode"] = "debug"
+    runner = CommandRunner()
+    system_tools = SystemTools(runner)
+    registry = ToolRegistry(system_tools, DiskTools(runner), ProcessTools(runner))
+    graph = build_agent_graph(registry).compile()
+    state = graph.invoke(state)
+
+    response = state["response"]
+    assert "Intent:" in response
+    assert "Environment:" in response
+    assert "Plan:" in response
+    assert "Risk:" in response
+    assert "Action:" in response
+    assert "Command Trace:" in response
+    assert "Verification:" in response
+    assert "State:" in response
+    assert "Next:" in response
 
 
 def test_jsonl_audit_file_receives_step_records(tmp_path) -> None:

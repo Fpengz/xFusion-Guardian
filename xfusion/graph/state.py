@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from xfusion.domain.models.approval import ApprovalRecord
@@ -42,6 +44,7 @@ class AgentGraphState(BaseModel):
         }
     )
     role_runtime_records: list[RoleProposalRuntimeRecord] = Field(default_factory=list)
+    response_mode: Literal["normal", "debug"] = "normal"
     response: str = ""
     audit_records: list[dict[str, object]] = Field(default_factory=list)
     audit_log_path: str | None = None

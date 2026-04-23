@@ -83,7 +83,8 @@ def test_strict_dependency_enforcement_on_failure():
 
     # Only the first tool should have been called
     assert registry.executed_tools == ["process.find_by_port"]
-    assert "one or more dependencies failed" in result["response"]
+    assert "Result:" in result["response"]
+    assert "couldn't complete" in result["response"].lower()
 
 
 def test_executed_tools_differ_from_plan_on_refusal():
@@ -114,7 +115,8 @@ def test_executed_tools_differ_from_plan_on_refusal():
 
     # No tools should have been executed
     assert registry.executed_tools == []
-    assert "cannot execute" in result["response"]
+    assert "Result:" in result["response"]
+    assert "couldn't run this request" in result["response"]
 
 
 def test_executed_tools_differ_from_plan_on_abort():
