@@ -213,3 +213,72 @@ def test_audit_record_emits_normalized_machine_codes() -> None:
     assert record["confirmation_type"] == "none"
     assert record["deny_code"] == "protected_path"
     assert record["non_execution"]["code"] in {"protected_path", "scope_violation"}
+
+
+def test_cross_plan_approval_replay_fails_closed() -> None:
+    registry = RecordingRegistry(
+        outputs={
+            "user.create": ToolOutput(summary="created", data={"exists": True}),
+        }
+    )
+    graph = build_agent_graph(registry).compile()
+
+    original_plan = ExecutionPlan(
+        plan_id="v024-replay-origin",
+        goal="create user",
+        language="en",
+        steps=[
+            PlanStep(
+                step_id="create_user",
+                capability="user.create",
+                args={"username": "demo-user"},
+                expected_outputs={"exists": "boolean"},
+                justification="Create bounded demo user.",
+                on_failure="stop",
+            )
+        ],
+        verification_strategy="verify replay guard",
+        verification_no_meaningful_verifier=True,
+    )
+    origin_state = graph.invoke(_state_for_plan(original_plan, user_input="create demo user"))
+    approval_id = origin_state["pending_approval_id"]
+    assert approval_id
+    approval_record = origin_state["approval_records"][approval_id]
+    phrase = origin_state["pending_confirmation_phrase"]
+    assert phrase
+
+    # Attempt to replay an approval record/phrase in a different plan context.
+    replay_plan = ExecutionPlan(
+        plan_id="v024-replay-target",
+        goal="create user",
+        language="en",
+        steps=[
+            PlanStep(
+                step_id="create_user",
+                capability="user.create",
+                args={"username": "demo-user"},
+                expected_outputs={"exists": "boolean"},
+                justification="Create bounded demo user.",
+                on_failure="stop",
+                approval_id=approval_id,
+                confirmation_phrase=phrase,
+            )
+        ],
+        interaction_state=InteractionState.AWAITING_CONFIRMATION,
+        status="awaiting_confirmation",
+        verification_strategy="verify replay guard",
+        verification_no_meaningful_verifier=True,
+    )
+    replay_state = _state_for_plan(replay_plan, user_input=phrase)
+    replay_state["approval_records"] = {approval_id: approval_record}
+    replay_state["pending_approval_id"] = approval_id
+
+    result = graph.invoke(replay_state)
+
+    assert result["plan"].interaction_state == InteractionState.FAILED
+    assert result["plan"].steps[0].failure_class == "approval_invalidated"
+    assert result["plan"].steps[0].non_execution_code in {
+        "material_change",
+        "policy_snapshot_mismatch",
+    }
+    assert registry.calls == []
