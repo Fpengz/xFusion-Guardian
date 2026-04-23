@@ -41,6 +41,21 @@ def build_referenced_output_fingerprints(
     return fingerprints
 
 
+def build_step_binding(plan: ExecutionPlan, step: PlanStep) -> dict[str, Any]:
+    """Build deterministic step identity data bound into policy and approval fingerprints."""
+    step_index = next(
+        (index for index, candidate in enumerate(plan.steps) if candidate.step_id == step.step_id),
+        -1,
+    )
+    return {
+        "plan_id": plan.plan_id,
+        "step_id": step.step_id,
+        "step_index": step_index,
+        "depends_on": list(step.depends_on),
+        "repair_of_step_id": step.repair_of_step_id,
+    }
+
+
 def build_action_fingerprint(
     *,
     capability: CapabilityDefinition,
@@ -49,6 +64,9 @@ def build_action_fingerprint(
     target_context: dict[str, Any],
     approval_mode: ApprovalMode,
     risk_tier: RiskTier,
+    risk_contract: dict[str, Any] | None,
+    policy_snapshot_hash: str,
+    step_binding: dict[str, Any],
     referenced_output_fingerprints: dict[str, str],
     grouped_mutations: list[str] | None = None,
 ) -> str:
@@ -61,6 +79,9 @@ def build_action_fingerprint(
         "target_context": target_context,
         "approval_mode": approval_mode,
         "risk_tier": risk_tier,
+        "risk_contract": risk_contract or {},
+        "policy_snapshot_hash": policy_snapshot_hash,
+        "step_binding": step_binding,
         "referenced_output_fingerprints": referenced_output_fingerprints,
         "grouped_mutations": grouped_mutations or [capability.name],
     }
@@ -109,6 +130,8 @@ def create_approval_record(
     target_context: dict[str, Any],
     approval_mode: ApprovalMode,
     risk_tier: RiskTier,
+    policy_snapshot_hash: str,
+    step_binding: dict[str, Any],
     authorized_outputs: dict[str, dict[str, Any]],
     ttl_minutes: int = 10,
 ) -> ApprovalRecord:
@@ -124,10 +147,14 @@ def create_approval_record(
         target_context=target_context,
         approval_mode=approval_mode,
         risk_tier=risk_tier,
+        risk_contract=step.risk_contract,
+        policy_snapshot_hash=policy_snapshot_hash,
+        step_binding=step_binding,
         referenced_output_fingerprints=referenced_output_fingerprints,
     )
     approval_id = f"apr_{uuid4().hex[:12]}"
-    phrase = f"APPROVE {approval_id} {fingerprint[:12]}"
+    prefix = "ADMIN_APPROVE" if approval_mode == ApprovalMode.ADMIN else "APPROVE"
+    phrase = f"{prefix} {approval_id} {fingerprint[:12]}"
     preview = build_preview_payload(
         capability=capability,
         step=step,
@@ -143,6 +170,7 @@ def create_approval_record(
         normalized_capability_set=[capability.name],
         target_context=target_context,
         action_fingerprint=fingerprint,
+        policy_snapshot_hash=policy_snapshot_hash,
         referenced_output_fingerprints=referenced_output_fingerprints,
         approval_mode=approval_mode,
         risk_tier=risk_tier,
@@ -162,6 +190,9 @@ def validate_approval_for_invocation(
     target_context: dict[str, Any],
     approval_mode: ApprovalMode,
     risk_tier: RiskTier,
+    risk_contract: dict[str, Any] | None,
+    policy_snapshot_hash: str,
+    step_binding: dict[str, Any],
     argument_provenance: dict[str, str],
     referenced_output_fingerprints: dict[str, str],
 ) -> tuple[bool, str]:
@@ -176,8 +207,13 @@ def validate_approval_for_invocation(
         target_context=target_context,
         approval_mode=approval_mode,
         risk_tier=risk_tier,
+        risk_contract=risk_contract,
+        policy_snapshot_hash=policy_snapshot_hash,
+        step_binding=step_binding,
         referenced_output_fingerprints=referenced_output_fingerprints,
     )
     if current != approval.action_fingerprint:
         return False, "material_change"
+    if approval.policy_snapshot_hash != policy_snapshot_hash:
+        return False, "policy_snapshot_mismatch"
     return True, "approval_valid"

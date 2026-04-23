@@ -19,11 +19,13 @@ def confirm_node(state: AgentGraphState) -> AgentGraphState:
     expected = (step.confirmation_phrase or "").strip()
     actual = state.user_input.strip()
     approval = state.approval_records.get(state.pending_approval_id or step.approval_id or "")
-
     if expected and approval and actual == expected and not approval.is_expired():
         approval.approved_at = datetime.now(UTC)
         state.plan.interaction_state = InteractionState.EXECUTING
         step.requires_confirmation = False
+        step.confirmation_supplied = True
+        step.non_execution_code = None
+        step.non_execution_reason_text = None
         state.response = "Confirmation received. Proceeding..."
         log_graph_event(
             state,
@@ -35,18 +37,23 @@ def confirm_node(state: AgentGraphState) -> AgentGraphState:
     else:
         state.plan.interaction_state = InteractionState.ABORTED
         state.plan.status = "aborted"
+        step.confirmation_supplied = False
         reason = "approval_expired" if approval and approval.is_expired() else "phrase_mismatch"
         step.failure_class = (
             FailureClass.APPROVAL_EXPIRED.value
             if reason == "approval_expired"
             else FailureClass.APPROVAL_DENIED.value
         )
+        step.non_execution_code = reason
+        step.non_execution_reason_text = f"Action aborted: approval failed ({reason})."
         step.failure_details = {
             "failure_class": step.failure_class,
+            "non_execution_code": step.non_execution_code,
+            "non_execution_reason_text": step.non_execution_reason_text,
             "approval_id": approval.approval_id if approval else None,
             "reason": reason,
         }
-        state.response = f"Action aborted: approval failed ({reason})."
+        state.response = step.non_execution_reason_text
         if approval:
             approval.invalidated_at = datetime.now(UTC)
             approval.invalidation_reason = reason

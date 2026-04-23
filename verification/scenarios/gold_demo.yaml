@@ -163,7 +163,7 @@
       - "cleanup.safe_disk_cleanup"
       - "disk.check_usage"
     executed_tools: []
-    risk_level: medium
+    risk_level: high
     interaction_state: awaiting_confirmation
     requires_confirmation: true
     verification_method: state_re_read

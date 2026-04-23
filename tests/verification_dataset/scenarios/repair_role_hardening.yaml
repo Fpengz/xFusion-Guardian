@@ -54,7 +54,7 @@
       required_capabilities: [process.kill]
     policy:
       process.kill:
-        decision: require_approval
+        decision: require_confirmation
         risk_tier: 1
     approval:
       required: true
@@ -89,7 +89,7 @@
       required_capabilities: [process.kill]
     policy:
       process.kill:
-        decision: require_approval
+        decision: require_confirmation
         risk_tier: 1
     approval:
       required: true
@@ -125,7 +125,7 @@
       required_capabilities: [process.kill]
     policy:
       process.kill:
-        decision: require_approval
+        decision: require_confirmation
         risk_tier: 1
     approval:
       required: true

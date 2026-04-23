@@ -366,7 +366,7 @@ def test_legacy_ref_dict_is_blocked_before_approval_or_execution() -> None:
     )
 
 
-def test_policy_uses_v02_allow_require_approval_deny_decisions() -> None:
+def test_policy_uses_v02_allow_require_confirmation_deny_decisions() -> None:
     allowed = evaluate_policy(
         capability_name="system.service_status",
         resolved_args={"service": "nginx"},

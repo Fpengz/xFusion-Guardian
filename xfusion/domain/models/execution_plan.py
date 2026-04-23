@@ -30,9 +30,15 @@ class PlanStep(BaseModel):
     resolved_references: dict[str, object] = Field(default_factory=dict)
     adapter_id: str | None = None
     policy_rule_id: str | None = None
+    policy_snapshot_hash: str | None = None
+    policy_snapshot: dict[str, object] = Field(default_factory=dict)
     approval_mode: ApprovalMode | None = None
+    risk_contract: dict[str, object] = Field(default_factory=dict)
+    confirmation_supplied: bool | None = None
     authorized_output_accepted: bool = False
     failure_class: str | None = None
+    non_execution_code: str | None = None
+    non_execution_reason_text: str | None = None
     failure_details: dict[str, object] = Field(default_factory=dict)
     redaction_metadata: dict[str, object] = Field(default_factory=dict)
     started_at: str | None = None

@@ -46,7 +46,9 @@ class ApprovalMode(StrEnum):
 
 class PolicyDecisionValue(StrEnum):
     ALLOW = "allow"
-    REQUIRE_APPROVAL = "require_approval"
+    REQUIRE_CONFIRMATION = "require_confirmation"
+    # Backward-compatible alias; normalized value is require_confirmation.
+    REQUIRE_APPROVAL = "require_confirmation"
     DENY = "deny"
 
 

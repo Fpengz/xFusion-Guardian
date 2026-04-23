@@ -36,6 +36,7 @@ class ApprovalRecord(BaseModel):
     normalized_capability_set: list[str] = Field(min_length=1)
     target_context: dict[str, Any]
     action_fingerprint: str = Field(min_length=1)
+    policy_snapshot_hash: str = Field(min_length=1)
     referenced_output_fingerprints: dict[str, str] = Field(default_factory=dict)
     approval_mode: ApprovalMode
     risk_tier: RiskTier

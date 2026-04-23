@@ -8,9 +8,14 @@ from xfusion.graph.state import AgentGraphState
 from xfusion.planning.reference_resolver import resolve_args
 from xfusion.policy.approval import (
     build_argument_provenance,
+    build_step_binding,
     create_approval_record,
 )
-from xfusion.policy.rules import evaluate_policy
+from xfusion.policy.rules import (
+    build_policy_snapshot_hash,
+    build_policy_snapshot_payload,
+    evaluate_policy,
+)
 
 
 def policy_node(state: AgentGraphState) -> AgentGraphState:
@@ -94,6 +99,20 @@ def policy_node(state: AgentGraphState) -> AgentGraphState:
     step.requires_confirmation = decision.requires_approval
     step.policy_rule_id = decision.matched_rule_id
     step.approval_mode = decision.approval_mode
+    step.risk_contract = decision.risk_contract.model_dump() if decision.risk_contract else {}
+    step_binding = build_step_binding(state.plan, step)
+    policy_snapshot = build_policy_snapshot_payload(
+        capability_name=str(step.capability),
+        normalized_args=resolved_args,
+        argument_provenance=provenance,
+        decision=decision,
+        environment=state.environment,
+        step_binding=step_binding,
+    )
+    step.policy_snapshot = policy_snapshot
+    step.policy_snapshot_hash = build_policy_snapshot_hash(policy_snapshot)
+    step.non_execution_code = None
+    step.non_execution_reason_text = None
 
     if decision.decision == PolicyDecisionValue.DENY:
         step.status = StepStatus.REFUSED
@@ -102,13 +121,17 @@ def policy_node(state: AgentGraphState) -> AgentGraphState:
             if {"scope_violation", "scope_not_explicit"} & set(decision.reason_codes)
             else "policy_denial"
         )
+        step.non_execution_code = decision.deny_code or step.failure_class
+        step.non_execution_reason_text = decision.reason_text
         step.failure_details = {
             "failure_class": step.failure_class,
+            "non_execution_code": step.non_execution_code,
+            "non_execution_reason_text": step.non_execution_reason_text,
             "policy_decision": decision.model_dump(),
         }
         state.plan.interaction_state = InteractionState.REFUSED
         state.plan.status = "refused"
-        state.response = f"I cannot execute this step: {decision.reason}"
+        state.response = f"I cannot execute this step: {decision.reason_text}"
         log_graph_event(
             state,
             step=step,
@@ -122,7 +145,8 @@ def policy_node(state: AgentGraphState) -> AgentGraphState:
                 "policy_decision": decision.model_dump(),
             },
         )
-    elif decision.decision == PolicyDecisionValue.REQUIRE_APPROVAL:
+    elif decision.decision == PolicyDecisionValue.REQUIRE_CONFIRMATION:
+        step.confirmation_supplied = False
         existing = state.approval_records.get(step.approval_id or "")
         if existing and existing.is_approved:
             state.response = "Existing approval record found; validating before execution."
@@ -136,6 +160,8 @@ def policy_node(state: AgentGraphState) -> AgentGraphState:
             target_context=state.plan.target_context,
             approval_mode=decision.approval_mode,
             risk_tier=decision.risk_tier,
+            policy_snapshot_hash=step.policy_snapshot_hash or "",
+            step_binding=step_binding,
             authorized_outputs=state.authorized_step_outputs,
         )
         state.approval_records[approval.approval_id] = approval
@@ -148,8 +174,11 @@ def policy_node(state: AgentGraphState) -> AgentGraphState:
         phrase = approval.typed_confirmation_phrase
         step.confirmation_phrase = phrase
         state.pending_confirmation_phrase = phrase
+        confirmation_label = (
+            "admin confirmation" if decision.confirmation_type == "admin" else "user confirmation"
+        )
         state.response = (
-            "This action requires approval. "
+            f"This action requires {confirmation_label}. "
             f"Preview: {approval.preview.action_summary}; impacted target: "
             f"{approval.preview.impacted_target}. Please type: '{phrase}'"
         )

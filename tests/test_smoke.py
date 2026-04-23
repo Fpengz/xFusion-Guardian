@@ -99,7 +99,7 @@ def test_smoke_confirmation_flow():
     state = graph.invoke(state)
     assert state["plan"].interaction_state == InteractionState.AWAITING_CONFIRMATION
     phrase = state["pending_confirmation_phrase"]
-    assert phrase.startswith("APPROVE ")
+    assert phrase.startswith(("APPROVE ", "ADMIN_APPROVE "))
 
     # Second turn: user confirms with exact phrase
     state["user_input"] = phrase

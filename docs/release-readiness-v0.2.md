@@ -5,6 +5,15 @@ normative behavior remains [docs/specs/xfusion-v0.2.md](specs/xfusion-v0.2.md).
 
 ## What Changed
 
+- v0.2.4 keeps deterministic per-step risk classification and adds normalized
+  machine-readable policy outputs (`decision`, `confirmation_type`,
+  `deny_code`) with separate human-readable reasoning text.
+- v0.2.4 makes `high` risk explicit and enforced through admin confirmation
+  semantics, while preserving fail-closed deny behavior for `critical`.
+- v0.2.4 adds execute-time policy integrity snapshots and stronger approval
+  binding against step/order/dependency/state drift.
+- v0.2.4 audit records now include normalized policy/non-execution code fields
+  in addition to human-readable summaries.
 - Execution is capability governed: plans invoke registered `capability + args`
   contracts instead of the legacy `tool + parameters` surface.
 - Static validation rejects unknown capabilities, conflicting legacy fields,
@@ -73,8 +82,21 @@ These are known follow-on hardening areas, not hidden debt:
 - Verification dataset integration is focused on high-value repair/role
   invariants; broader corpus expansion remains a follow-on track.
 
-See [docs/review-merge-readiness-v0.2.2.md](review-merge-readiness-v0.2.2.md)
-for reviewer-facing PR summary, review guide, and follow-on backlog packaging.
+## Deferred Modules (Post-v0.2.4)
+
+These follow-ons are explicitly deferred beyond v0.2.4 and are tracked in the
+v0.2.4 release notes:
+[docs/release-plan-v0.2.4.md](release-plan-v0.2.4.md).
+
+- Broader command-family policy coverage beyond current registered capabilities.
+- More configurable policy tables and environment profile overrides.
+- Physical runtime isolation/sandboxing (outside the v0.2.4 deterministic scope).
+- Additional adversarial verification corpus expansion for policy permutations.
+
+Status: **Post-v0.2.4 Deferred**.
+
+See [docs/release-plan-v0.2.4.md](release-plan-v0.2.4.md) for reviewer-facing
+release packaging and follow-on backlog.
 
 ## Verification Gate
 

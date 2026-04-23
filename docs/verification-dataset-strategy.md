@@ -245,7 +245,7 @@ expected:
 
   policy:
     terminate_process:
-      decision: "require_approval"
+      decision: "require_confirmation"
       risk_tier: 1
 
   approval:
@@ -331,7 +331,7 @@ Recommended dimensions:
 | Dimension            | Values                                                        |
 | -------------------- | ------------------------------------------------------------- |
 | capability class     | Tier 0, Tier 1, Tier 2, Tier 3                                |
-| policy outcome       | allow, require_approval, deny                                 |
+| policy outcome       | allow, require_confirmation, deny                                 |
 | approval state       | none, pending, granted, expired, invalidated, denied          |
 | reference state      | valid, missing, wrong type, unauthorized, stale, forged       |
 | runtime state        | success, timeout, adapter failure, execution failure, blocked |
@@ -465,8 +465,8 @@ Take one valid case and vary a single factor:
 
 Then assert the expected state transition changes appropriately:
 
-* allow → require_approval
-* require_approval → deny
+* allow → require_confirmation
+* require_confirmation → deny
 * success → invalidated approval
 * visible output → redacted output
 * valid reference → blocked reference
