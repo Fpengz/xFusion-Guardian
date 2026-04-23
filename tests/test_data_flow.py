@@ -11,11 +11,11 @@ class MockRegistry:
     def __init__(self, outputs=None):
         self.outputs = outputs or {}
         self.executed_tools = []
-        self.calls = []  # List of (name, parameters)
+        self.calls = []  # List of (name, args)
 
-    def execute(self, name, parameters):
+    def execute(self, name, args):
         self.executed_tools.append(name)
-        self.calls.append((name, parameters))
+        self.calls.append((name, args))
 
         # Mock behavior for port workflow verification
         if (
@@ -149,11 +149,7 @@ def test_reference_resolution_error_missing_step():
                 intent="intent1",
                 capability="system.detect_os",
                 args={"target": {"ref": "nonexistent_step.data"}},
-                expected_output="ok",
-                verification_method="tool_success",
-                success_condition="ok",
-                failure_condition="fail",
-                fallback_action="stop",
+                on_failure="stop",
             )
         ],
     )

@@ -10,6 +10,16 @@ controlled adapters, mandatory verification, short-lived memory, redaction, and
 JSONL audit records so Linux admin workflows are explainable, bounded, and
 testable.
 
+## Reviewer Start Here
+
+If you are reviewing safety, authority boundaries, or merge readiness, start in
+this order:
+
+1. [docs/specs/xfusion-v0.2.md](docs/specs/xfusion-v0.2.md) (normative source of truth)
+2. [docs/architecture/capability-schema.md](docs/architecture/capability-schema.md) (schema contract)
+3. [docs/release-readiness-v0.2.md](docs/release-readiness-v0.2.md) (current reviewer posture)
+4. [docs/review-merge-readiness-v0.2.2.md](docs/review-merge-readiness-v0.2.2.md) (current PR/review artifacts and known follow-ons)
+
 ## What It Does
 
 - Understands English and Chinese Linux admin requests.
@@ -75,9 +85,12 @@ Important trust boundary:
 - [xfusion/](xfusion/) - Python package and agent implementation
 - [docs/specs/xfusion-v0.2.md](docs/specs/xfusion-v0.2.md) - normative v0.2 spec
 - [docs/architecture/capability-schema.md](docs/architecture/capability-schema.md) - XFusion Capability Schema contract
+- [docs/architecture/schema-subset.md](docs/architecture/schema-subset.md) - quick pointer to the schema subset contract
 - [docs/release-readiness-v0.2.md](docs/release-readiness-v0.2.md) - reviewer notes
+- [docs/review-merge-readiness-v0.2.2.md](docs/review-merge-readiness-v0.2.2.md) - PR summary and reviewer guide
 - [docs/verification-suite.md](docs/verification-suite.md) - verification suite design
 - [docs/archive/v0.1/](docs/archive/v0.1/) - historical, non-normative legacy materials
+- [CHANGELOG.md](CHANGELOG.md) - release notes
 - [verification/scenarios/](verification/scenarios/) - YAML scenario suite
 - [tests/](tests/) - smoke, safety, workflow, and verification runner tests
 - [AGENTS.md](AGENTS.md) - context guide for future agents and engineers
@@ -167,9 +180,13 @@ the dangerous decisions inspectable and controllable.
 
 ## Status
 
-v0.2 capability-governed execution is implemented and tested. The v0.2 spec is
-the normative source of truth. Legacy materials live only in the historical
-archive and are explicitly non-normative.
+v0.2 capability-governed execution is implemented and tested. The current
+hardening baseline is `v0.2.2`, which keeps the v0.2 architecture authoritative
+while tightening repair/equivalence handling, clarifying containment guardrail
+boundaries, and increasing verification corpus depth. The v0.2 spec remains the
+normative source of truth.
+Legacy materials live only in the historical archive and are explicitly
+non-normative.
 
 | Area | Status |
 | --- | --- |

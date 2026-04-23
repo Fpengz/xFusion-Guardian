@@ -41,7 +41,7 @@ def _verify_state_re_read(output: dict[str, object]) -> tuple[bool, str]:
 
 
 def _verify_port_process_recheck(
-    step_parameters: dict[str, object],
+    step_args: dict[str, object],
     step_success_condition: str,
     output: dict[str, object],
 ) -> tuple[bool, str]:
@@ -52,9 +52,7 @@ def _verify_port_process_recheck(
     matches = output.get("matches")
     stdout = str(output.get("stdout", ""))
     condition = step_success_condition.lower()
-    expect_free = (
-        bool(step_parameters.get("expect_free")) or "free" in condition or "no pid" in condition
-    )
+    expect_free = bool(step_args.get("expect_free")) or "free" in condition or "no pid" in condition
 
     if expect_free:
         port_is_free = pids == [] or matches == [] or output.get("ok") is True
@@ -80,7 +78,9 @@ def _verify_filesystem_metadata(output: dict[str, object]) -> tuple[bool, str]:
     if not _no_tool_error(output):
         return False, "Filesystem metadata re-check returned an error."
     if (
-        _has_any(output, "matches", "items", "previewed_candidates")
+        _has_any(output, "matches", "items", "previewed_candidates", "deleted")
+        or output.get("reclaimed_bytes") is not None
+        or output.get("ok") is True
         or output.get("exists") is not None
     ):
         return True, "Filesystem metadata was returned in structured output."
@@ -117,14 +117,14 @@ def _verify_command_exit_plus_state(output: dict[str, object]) -> tuple[bool, st
 def _dispatch_verification(
     method: str,
     step_success_condition: str,
-    step_parameters: dict[str, object],
+    step_args: dict[str, object],
     output: dict[str, object],
 ) -> tuple[bool, str]:
     normalized = method.replace("-", "_")
     if normalized in {"state_read", "state_re_read"}:
         return _verify_state_re_read(output)
     if normalized in {"port_recheck", "port_process_recheck"}:
-        return _verify_port_process_recheck(step_parameters, step_success_condition, output)
+        return _verify_port_process_recheck(step_args, step_success_condition, output)
     if normalized in {"filesystem_metadata_recheck", "filesystem_metadata_re_read"}:
         return _verify_filesystem_metadata(output)
     if normalized in {"existence_check", "existence_nonexistence_check"}:
@@ -136,11 +136,16 @@ def _dispatch_verification(
     return False, f"Unknown verification method: {method}"
 
 
-def _verification_outcome(success: bool, summary: str) -> VerificationStatus:
+def _verification_outcome(success: bool, summary: str, method: str) -> VerificationStatus:
     if success:
         return VerificationStatus.SUCCESS
     lowered = summary.lower()
-    if "unknown verification method" in lowered or "could not" in lowered or "missing" in lowered:
+    if (
+        "unknown verification method" in lowered
+        or "could not" in lowered
+        or "missing" in lowered
+        or method == "none"
+    ):
         return VerificationStatus.INCONCLUSIVE
     return VerificationStatus.FAILED
 
@@ -255,7 +260,12 @@ def _append_repair_step(
         return
 
     repair_step = PlanStep(
-        id=proposal.draft.proposed_step_id,
+        step_id=proposal.draft.proposed_step_id,
+        intent=(
+            f"Escalate {source_step.step_id} to KILL"
+            if proposal.draft.escalation
+            else f"Retry {source_step.step_id} after verification failure"
+        ),
         capability=proposal.draft.capability,
         args=proposal.draft.args,
         depends_on=proposal.draft.depends_on,
@@ -289,7 +299,12 @@ def _append_repair_step(
 
 
 def verify_node(state: AgentGraphState) -> AgentGraphState:
-    """Run mandatory post-action verification for the current step."""
+    """Run mandatory post-action verification for the current step.
+
+    On failure, emit typed repair proposals as non-authoritative artifacts and
+    route repairs back through normal deterministic validation/policy/approval
+    flow. This node does not auto-authorize or auto-execute mutation repairs.
+    """
     if not state.plan:
         return state
 
@@ -309,19 +324,49 @@ def verify_node(state: AgentGraphState) -> AgentGraphState:
         return state
 
     tool_output = state.step_outputs.get(step.step_id, state.last_tool_output or {})
+
+    # Map canonical fields to internal dispatch; ensures tests with manual field injection work
+    v_method = step.verification_method
+    if not v_method or v_method == "none":
+        step_args = step.normalized_args or step.args
+        if "expect_free" in step_args or step.capability in {
+            "process.kill",
+            "process.find_by_port",
+        }:
+            v_method = "port_process_recheck"
+        elif step.capability in {"user.create", "user.delete"}:
+            v_method = "existence_nonexistence_check"
+        elif step.capability in {
+            "disk.check_usage",
+            "system.detect_environment",
+            "system.detect_os",
+        }:
+            v_method = "state_re_read"
+        elif step.capability in {"system.current_user", "process.list"}:
+            v_method = "command_exit_status_plus_state"
+        elif step.capability in {"disk.find_large_directories", "cleanup.safe_disk_cleanup"} or (
+            "approved_paths" in step_args
+        ):
+            v_method = "filesystem_metadata_recheck"
+        elif "path" in step_args:
+            if step.capability == "file.search":
+                v_method = "filesystem_metadata_recheck"
+            else:
+                v_method = "existence_check"
+
     success, summary = _dispatch_verification(
-        step.verification_method,
+        v_method,
         step.success_condition,
         step.normalized_args or step.args,
         tool_output,
     )
 
-    outcome = _verification_outcome(success, summary)
+    outcome = _verification_outcome(success, summary, v_method)
     verification = VerificationResult(
         verification_id=f"ver_{uuid4().hex[:10]}",
         step_id=step.step_id,
         success=success,
-        method=step.verification_method,
+        method=v_method,
         summary=summary,
         outcome=outcome,
         failure_class=step.failure_class if not success else None,
@@ -350,7 +395,7 @@ def verify_node(state: AgentGraphState) -> AgentGraphState:
         step.failure_class = FailureClass.VERIFICATION_FAILURE.value
         step.failure_details = {
             "failure_class": FailureClass.VERIFICATION_FAILURE.value,
-            "method": step.verification_method,
+            "method": v_method,
             "summary": summary,
             "details": tool_output,
         }

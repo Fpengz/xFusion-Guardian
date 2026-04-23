@@ -84,7 +84,7 @@ def _validate_acyclic(steps: list[PlanStep]) -> bool:
 
     for step in steps:
         step_id = str(step.step_id)
-        for dep in step.dependencies:
+        for dep in step.depends_on:
             if dep not in step_ids:
                 continue
             incoming_count[step_id] += 1
@@ -243,7 +243,7 @@ def validate_plan(
         has_mutation = has_mutation or not capability.is_read_only
         _validate_literal_args(step=step, input_schema=capability.input_schema, errors=errors)
 
-        for dep in step.dependencies:
+        for dep in step.depends_on:
             if dep not in step_id_set:
                 errors.append(
                     PlanValidationError(
@@ -277,7 +277,7 @@ def validate_plan(
                 )
                 continue
 
-            if ref_step_id not in step.dependencies:
+            if ref_step_id not in step.depends_on:
                 errors.append(
                     PlanValidationError(
                         code="reference_not_dependency",

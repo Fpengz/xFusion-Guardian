@@ -84,7 +84,10 @@ class RoleProposalValidationResult(BaseModel):
 
 
 class RoleProposalRuntimeRecord(BaseModel):
-    """Runtime-attributed role proposal enforcement record."""
+    """Runtime-attributed role proposal enforcement record.
+
+    This makes role-boundary decisions observable in authoritative audit state.
+    """
 
     model_config = ConfigDict(extra="forbid")
 

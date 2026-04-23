@@ -15,8 +15,8 @@ class WorkflowRegistry:
         self.calls: list[tuple[str, dict[str, object]]] = []
         self.cleanup_executed = False
 
-    def execute(self, name: str, parameters: dict[str, Any]) -> ToolOutput:
-        self.calls.append((name, parameters))
+    def execute(self, name: str, args: dict[str, Any]) -> ToolOutput:
+        self.calls.append((name, args))
         if name == "disk.check_usage":
             return ToolOutput(summary="Disk usage: 94% full.", data={"usage_percent": 94})
         if name == "disk.find_large_directories":
@@ -24,7 +24,7 @@ class WorkflowRegistry:
                 summary="Found demo cache.", data={"items": ["/tmp/xfusion-demo-big"]}
             )
         if name == "cleanup.safe_disk_cleanup":
-            if parameters.get("execute") is True:
+            if args.get("execute") is True:
                 self.cleanup_executed = True
                 return ToolOutput(
                     summary="Deleted 1 safe cleanup candidate.",
