@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from typing import Any, cast
 
 from rich.markdown import Markdown
@@ -20,7 +21,16 @@ from xfusion.app.commands.core import (
     HelpCommand,
     NewCommand,
 )
+from xfusion.app.commands.info import (
+    CompactCommand,
+    ConfigCommand,
+    ModelCommand,
+    PermissionsCommand,
+    StatusCommand,
+)
 from xfusion.app.commands.registry import CommandRegistry
+from xfusion.app.commands.session import HistoryCommand, ResumeCommand, SessionsCommand
+from xfusion.app.sessions import SessionManager
 from xfusion.app.settings import load_settings
 from xfusion.domain.enums import InteractionState, StepStatus
 from xfusion.domain.models.environment import EnvironmentState
@@ -315,7 +325,16 @@ class XFusionTUI(App):
         self.command_registry.register(NewCommand())
         self.command_registry.register(DebugCommand())
         self.command_registry.register(ClearCommand())
+        self.command_registry.register(SessionsCommand())
+        self.command_registry.register(ResumeCommand())
+        self.command_registry.register(HistoryCommand())
+        self.command_registry.register(StatusCommand())
+        self.command_registry.register(PermissionsCommand())
+        self.command_registry.register(ConfigCommand())
+        self.command_registry.register(ModelCommand())
+        self.command_registry.register(CompactCommand())
 
+        self.session_manager = SessionManager()
         self.runner = CommandRunner()
         self.system_tools = SystemTools(self.runner)
         self.disk_tools = DiskTools(self.runner)
@@ -337,6 +356,7 @@ class XFusionTUI(App):
 
     def init_state(self) -> None:
         """Initialize or reset the agent state."""
+        self.session_id = str(uuid.uuid4())[:8]
         settings = load_settings()
         env_output = self.system_tools.detect_os()
         initial_env = EnvironmentState.model_validate(env_output.data)
@@ -364,7 +384,7 @@ class XFusionTUI(App):
         env = cast(EnvironmentState, self.state["environment"])
         mode = cast(str, self.state["response_mode"])
         text = (
-            f"{env.distro_family} {env.distro_version} | "
+            f"ID: {self.session_id} | {env.distro_family} {env.distro_version} | "
             f"User: {env.current_user} | Mode: {mode.upper()}"
         )
         self.query_one("#status-bar", Static).update(text)
@@ -497,14 +517,22 @@ class XFusionTUI(App):
             audit_log.write(f"[dim]Node:[/] [bold blue]{message.node_name}[/]")
 
         plan = message.state.get("plan")
-        is_awaiting = (
-            isinstance(plan, ExecutionPlan)
-            and plan.interaction_state == InteractionState.AWAITING_CONFIRMATION
-        )
-        if is_awaiting:
-            phrase = message.state.get("pending_confirmation_phrase")
-            if phrase:
-                self.push_screen(ApprovalModal(phrase), callback=self.on_approval_submitted)
+        if isinstance(plan, ExecutionPlan):
+            # Save session if terminal or awaiting
+            term_states = {
+                InteractionState.COMPLETED,
+                InteractionState.FAILED,
+                InteractionState.REFUSED,
+                InteractionState.ABORTED,
+                InteractionState.AWAITING_CONFIRMATION,
+            }
+            if plan.interaction_state in term_states:
+                self.session_manager.save_session(self.session_id, self.state)
+
+            if plan.interaction_state == InteractionState.AWAITING_CONFIRMATION:
+                phrase = message.state.get("pending_confirmation_phrase")
+                if phrase:
+                    self.push_screen(ApprovalModal(phrase), callback=self.on_approval_submitted)
 
     def on_approval_submitted(self, phrase: str | None) -> None:
         if phrase is None:
