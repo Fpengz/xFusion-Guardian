@@ -439,6 +439,7 @@ class XFusionTUI(App):
     def add_agent_message(self, state: dict[str, Any]) -> AgentMessage:
         msg = AgentMessage(state)
         self.query_one("#timeline", VerticalScroll).mount(msg)
+        msg.update_state(state)
         msg.scroll_visible()
         return msg
 
