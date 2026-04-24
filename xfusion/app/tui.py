@@ -152,7 +152,9 @@ class AgentMessage(Static):
         if mode == "debug":
             audit_records = state.get("audit_records", [])
             if audit_records:
-                self.debug_container.mount(Label("[bold yellow]Audit Trace:[/]", id="debug-header"))
+                self.debug_container.mount(
+                    Label("[bold yellow]Audit Trace:[/]", classes="debug-header")
+                )
                 for rec in audit_records[-5:]:  # Show last 5
                     msg = rec.get("message", str(rec))
                     self.debug_container.mount(Static(f"[dim]• {msg}[/]", classes="debug-entry"))
