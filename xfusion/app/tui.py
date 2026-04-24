@@ -237,7 +237,6 @@ class CommandPalette(VerticalScroll):
         margin-bottom: 3;
         margin-left: 1;
         padding: 0 1;
-        z-index: 100;
     }
     CommandPalette CommandItem {
         padding: 0 1;
