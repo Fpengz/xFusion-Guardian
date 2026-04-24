@@ -302,7 +302,7 @@ class XFusionTUI(App):
         padding: 0 1;
     }
     .debug-entry {
-        font-size: 80%;
+        text-style: dim;
     }
     #agent-header {
         margin-bottom: 0;
