@@ -106,17 +106,22 @@ class AgentMessage(Static):
         self.header = Label("[bold #a78bfa]✦ Guardian[/]", id="agent-header")
         self.thinking_label = Label("[italic #6b7280]Thinking...[/]", id="thinking")
         self.steps_container = Vertical(id="steps")
+        self.policy_label = Static("", id="policy-info")
         self.explanation_label = Static("", id="explanation")
+        self.debug_container = Vertical(id="debug-info")
 
     def compose(self) -> ComposeResult:
         yield self.header
         yield self.thinking_label
         yield self.steps_container
+        yield self.policy_label
         yield self.explanation_label
+        yield self.debug_container
 
     def update_state(self, state: dict[str, Any]):
         self.state = state
         plan = state.get("plan")
+        mode = state.get("response_mode", "normal")
 
         if state.get("response"):
             self.thinking_label.display = False
@@ -134,6 +139,23 @@ class AgentMessage(Static):
 
         if state.get("response"):
             self.explanation_label.update(Markdown(state["response"]))
+
+        # Debug/Policy Info
+        decision = state.get("policy_decision")
+        if decision and mode == "debug":
+            self.policy_label.update(f"[dim]Policy:[/] [bold]{decision}[/]")
+            self.policy_label.display = True
+        else:
+            self.policy_label.display = False
+
+        self.debug_container.remove_children()
+        if mode == "debug":
+            audit_records = state.get("audit_records", [])
+            if audit_records:
+                self.debug_container.mount(Label("[bold yellow]Audit Trace:[/]", id="debug-header"))
+                for rec in audit_records[-5:]:  # Show last 5
+                    msg = rec.get("message", str(rec))
+                    self.debug_container.mount(Static(f"[dim]• {msg}[/]", classes="debug-entry"))
 
 
 class ApprovalModal(ModalScreen[str]):
@@ -237,6 +259,7 @@ class XFusionTUI(App):
     BINDINGS = [
         Binding("ctrl+b", "toggle_sidebar", "Toggle Context"),
         Binding("ctrl+d", "toggle_debug", "Debug Mode"),
+        Binding("ctrl+l", "clear_screen", "Clear Screen"),
         Binding("ctrl+c", "quit", "Quit"),
     ]
 
@@ -268,6 +291,18 @@ class XFusionTUI(App):
     }
     AgentMessage {
         margin: 1 0;
+    }
+    #policy-info {
+        color: #facc15;
+        margin-top: 1;
+    }
+    #debug-info {
+        margin-top: 1;
+        border: solid #334155;
+        padding: 0 1;
+    }
+    .debug-entry {
+        font-size: 80%;
     }
     #agent-header {
         margin-bottom: 0;
@@ -407,6 +442,9 @@ class XFusionTUI(App):
         self.query_one("#timeline", VerticalScroll).mount(msg)
         msg.scroll_visible()
         return msg
+
+    def action_clear_screen(self) -> None:
+        self.query_one("#timeline").remove_children()
 
     def action_toggle_sidebar(self) -> None:
         sidebar = self.query_one("#sidebar")
