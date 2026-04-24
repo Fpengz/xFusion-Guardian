@@ -106,11 +106,34 @@ Install dependencies with `uv`:
 uv sync --dev
 ```
 
-Run the CLI:
+Run the CLI (launches the Interactive TUI):
 
 ```bash
 uv run xfusion
 ```
+
+### Interactive TUI & Slash Commands
+
+The interactive TUI provides a modern "Guardian" experience with first-class slash commands and a searchable command palette.
+
+- **Trigger Palette**: Type `/` to open the searchable command palette.
+- **Navigation**: Use `Up`/`Down` arrows to navigate commands and `Tab` to autocomplete.
+- **Cancel/Close**: Use `Esc` to close the palette or `Ctrl+C` to cancel current input.
+
+#### Core Commands
+- `/help`: Show all available commands and descriptions.
+- `/new`: Start a fresh conversation session.
+- `/clear`: Visually clear the terminal timeline (shortcut: `Ctrl+L`).
+- `/debug`: Toggle verbose execution mode (shows internal traces and policy details).
+- `/exit`: Gracefully exit the application.
+
+#### Session & Info Commands
+- `/sessions`: List saved conversation sessions.
+- `/resume <id>`: Resume a previous session by its ID.
+- `/status`: Show current environment and session metadata.
+- `/permissions`: Display active execution policy and risk thresholds.
+- `/model`: View current LLM provider and model configuration.
+- `/config`: Show effective application settings.
 
 Run the verification gates:
 
