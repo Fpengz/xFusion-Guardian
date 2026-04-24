@@ -15,6 +15,7 @@ class BaseCommand(ABC):
     description: str
     usage: str
     is_client_only: bool = True
+    mutates_session_state: bool = False
 
     @abstractmethod
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:

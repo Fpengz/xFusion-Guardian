@@ -12,6 +12,7 @@ class SessionsCommand(BaseCommand):
     name = "sessions"
     description = "List saved sessions."
     usage = "/sessions"
+    mutates_session_state = False
 
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:
         from rich.table import Table
@@ -38,6 +39,7 @@ class ResumeCommand(BaseCommand):
     name = "resume"
     description = "Resume a previous session."
     usage = "/resume <session_id>"
+    mutates_session_state = True
 
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:
         if not args:
@@ -62,6 +64,7 @@ class HistoryCommand(BaseCommand):
     name = "history"
     description = "Show recent user/agent turns in the current session."
     usage = "/history"
+    mutates_session_state = False
 
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:
         # History is already visible in the timeline, but we can provide a summary

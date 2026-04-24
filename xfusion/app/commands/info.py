@@ -14,6 +14,7 @@ class StatusCommand(BaseCommand):
     name = "status"
     description = "Show current session and environment status."
     usage = "/status"
+    mutates_session_state = False
 
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:
         env = cast("EnvironmentState", app.state["environment"])
@@ -34,6 +35,7 @@ class PermissionsCommand(BaseCommand):
     aliases = ["policy"]
     description = "Show current execution policy and approval mode."
     usage = "/permissions"
+    mutates_session_state = False
 
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:
         # Pull from app settings and current state
@@ -57,6 +59,7 @@ class ConfigCommand(BaseCommand):
     name = "config"
     description = "Show effective settings."
     usage = "/config"
+    mutates_session_state = False
 
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:
         from xfusion.app.settings import load_settings
@@ -78,6 +81,7 @@ class ModelCommand(BaseCommand):
     name = "model"
     description = "Show current model configuration."
     usage = "/model"
+    mutates_session_state = False
 
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:
         from xfusion.app.settings import load_settings
@@ -95,6 +99,7 @@ class CompactCommand(BaseCommand):
     name = "compact"
     description = "Summarize current conversation into a compact snapshot."
     usage = "/compact"
+    mutates_session_state = True
 
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:
         # In a real implementation, this might call a special LLM node.

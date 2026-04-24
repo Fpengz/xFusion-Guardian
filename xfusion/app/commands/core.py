@@ -13,6 +13,7 @@ class ExitCommand(BaseCommand):
     aliases = ["quit", "q"]
     description = "Exit the TUI gracefully."
     usage = "/exit"
+    mutates_session_state = False
 
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:
         app.exit()
@@ -23,6 +24,7 @@ class HelpCommand(BaseCommand):
     aliases = ["h", "?"]
     description = "Show all available commands, aliases, and descriptions."
     usage = "/help"
+    mutates_session_state = False
 
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:
         from rich.table import Table
@@ -50,6 +52,7 @@ class NewCommand(BaseCommand):
     aliases = ["reset"]
     description = "Start a new conversation/session while keeping the TUI process alive."
     usage = "/new"
+    mutates_session_state = True
 
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:
         # Re-initialize state
@@ -63,6 +66,7 @@ class DebugCommand(BaseCommand):
     name = "debug"
     description = "Toggle debug mode."
     usage = "/debug"
+    mutates_session_state = True
 
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:
         from typing import cast
@@ -77,6 +81,7 @@ class ClearCommand(BaseCommand):
     aliases = ["cls"]
     description = "Clear visible terminal scrollback."
     usage = "/clear"
+    mutates_session_state = False
 
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:
         app.query_one("#timeline").remove_children()
