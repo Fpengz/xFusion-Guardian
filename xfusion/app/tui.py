@@ -12,6 +12,15 @@ from textual.message import Message
 from textual.screen import ModalScreen
 from textual.widgets import Footer, Input, Label, RichLog, Static
 
+from xfusion.app.commands.base import BaseCommand
+from xfusion.app.commands.core import (
+    ClearCommand,
+    DebugCommand,
+    ExitCommand,
+    HelpCommand,
+    NewCommand,
+)
+from xfusion.app.commands.registry import CommandRegistry
 from xfusion.app.settings import load_settings
 from xfusion.domain.enums import InteractionState, StepStatus
 from xfusion.domain.models.environment import EnvironmentState
@@ -163,6 +172,54 @@ class ApprovalModal(ModalScreen[str]):
             self.dismiss(None)
 
 
+class CommandItem(Static):
+    """A single command entry in the palette."""
+
+    def __init__(self, command: BaseCommand):
+        super().__init__()
+        self.command = command
+
+    def render(self) -> Text:
+        res = Text()
+        res.append(f"/{self.command.name}", style="bold cyan")
+        if self.command.aliases:
+            res.append(
+                f" ({', '.join(f'/{a}' for a in self.command.aliases)})", style="dim magenta"
+            )
+        res.append(f" - {self.command.description}", style="italic white")
+        return res
+
+
+class CommandPalette(VerticalScroll):
+    """The floating command palette."""
+
+    DEFAULT_CSS = """
+    CommandPalette {
+        display: none;
+        background: #0f172a;
+        border: solid #1e293b;
+        height: auto;
+        max-height: 10;
+        width: 80;
+        dock: bottom;
+        margin-bottom: 3;
+        margin-left: 1;
+        padding: 0 1;
+        z-index: 100;
+    }
+    CommandPalette CommandItem {
+        padding: 0 1;
+    }
+    CommandPalette CommandItem:hover {
+        background: #1e293b;
+    }
+    CommandPalette .selected {
+        background: #3b82f6;
+        color: white;
+    }
+    """
+
+
 class XFusionTUI(App):
     """The redesigned Timeline-first TUI for XFusion."""
 
@@ -239,8 +296,11 @@ class XFusionTUI(App):
         yield Static("Initializing...", id="status-bar")
         with Container(id="main-view"):
             yield VerticalScroll(id="timeline")
+            yield CommandPalette(id="command-palette")
             with Container(id="input-container"):
-                yield Input(placeholder="Ask XFusion Guardian...", id="main-input")
+                yield Input(
+                    placeholder="Ask XFusion Guardian (type / for commands)...", id="main-input"
+                )
         with Vertical(id="sidebar"):
             yield Static("[bold underline]ENVIRONMENT[/]")
             yield Static("", id="side-env")
@@ -249,17 +309,38 @@ class XFusionTUI(App):
         yield Footer()
 
     def on_mount(self) -> None:
-        settings = load_settings()
-        runner = CommandRunner()
-        system_tools = SystemTools(runner)
-        disk_tools = DiskTools(runner)
-        process_tools = ProcessTools(runner)
-        registry = ToolRegistry(system_tools, disk_tools, process_tools)
+        self.command_registry = CommandRegistry()
+        self.command_registry.register(ExitCommand())
+        self.command_registry.register(HelpCommand())
+        self.command_registry.register(NewCommand())
+        self.command_registry.register(DebugCommand())
+        self.command_registry.register(ClearCommand())
 
-        env_output = system_tools.detect_os()
+        self.runner = CommandRunner()
+        self.system_tools = SystemTools(self.runner)
+        self.disk_tools = DiskTools(self.runner)
+        self.process_tools = ProcessTools(self.runner)
+        self.registry = ToolRegistry(self.system_tools, self.disk_tools, self.process_tools)
+        self.graph = build_agent_graph(self.registry).compile()
+
+        self.init_state()
+
+        # Initial greeting
+        self.add_agent_message(
+            {
+                "response": (
+                    "✦ Hello! I am XFusion Guardian. "
+                    "How can I assist you with your Linux environment today?"
+                )
+            }
+        )
+
+    def init_state(self) -> None:
+        """Initialize or reset the agent state."""
+        settings = load_settings()
+        env_output = self.system_tools.detect_os()
         initial_env = EnvironmentState.model_validate(env_output.data)
 
-        self.graph = build_agent_graph(registry).compile()
         self.state = {
             "user_input": "",
             "environment": initial_env,
@@ -278,16 +359,6 @@ class XFusionTUI(App):
             "audit_log_path": settings.audit_log_path,
         }
         self.update_environment_display()
-
-        # Initial greeting
-        self.add_agent_message(
-            {
-                "response": (
-                    "✦ Hello! I am XFusion Guardian. "
-                    "How can I assist you with your Linux environment today?"
-                )
-            }
-        )
 
     def update_environment_display(self) -> None:
         env = cast(EnvironmentState, self.state["environment"])
@@ -326,12 +397,61 @@ class XFusionTUI(App):
         self.state["response_mode"] = mode
         self.update_environment_display()
 
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Show/hide command palette and filter results."""
+        palette = self.query_one("#command-palette", CommandPalette)
+        value = event.value.strip()
+
+        if value.startswith("/"):
+            query = value[1:].strip()
+            commands = self.command_registry.search(query)
+            if commands:
+                palette.display = True
+                palette.remove_children()
+                for i, cmd in enumerate(commands):
+                    item = CommandItem(cmd)
+                    if i == 0:
+                        item.add_class("selected")
+                    palette.mount(item)
+                palette.scroll_to(y=0)
+            else:
+                palette.display = False
+        else:
+            palette.display = False
+
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         user_input = event.value.strip()
         if not user_input:
             return
 
         event.input.value = ""
+        palette = self.query_one("#command-palette", CommandPalette)
+        palette.display = False
+
+        # Intercept slash commands
+        if user_input.startswith("/"):
+            parts = user_input[1:].split()
+            if not parts:
+                return
+
+            trigger = parts[0]
+            args = parts[1:]
+
+            command = self.command_registry.find(trigger)
+            if command:
+                self.add_user_message(user_input)
+                await command.handle(self, args)
+                return
+            else:
+                self.add_agent_message(
+                    {
+                        "response": (
+                            f"✘ Unknown command: `/{trigger}`. Type `/help` for available commands."
+                        )
+                    }
+                )
+                return
+
         self.add_user_message(user_input)
 
         # Reset transient state
