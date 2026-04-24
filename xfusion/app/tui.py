@@ -5,7 +5,7 @@ from typing import Any, cast
 
 from rich.markdown import Markdown
 from rich.text import Text
-from textual import work
+from textual import events, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Vertical, VerticalScroll
@@ -252,6 +252,31 @@ class CommandPalette(VerticalScroll):
     }
     """
 
+    def move_selection(self, direction: int) -> None:
+        """Move the selection up or down."""
+        items = self.query(CommandItem)
+        if not items:
+            return
+
+        current_index = -1
+        for i, item in enumerate(items):
+            if item.has_class("selected"):
+                current_index = i
+                item.remove_class("selected")
+                break
+
+        new_index = (current_index + direction) % len(items)
+        items[new_index].add_class("selected")
+        items[new_index].scroll_visible()
+
+    def get_selected(self) -> BaseCommand | None:
+        """Return the currently selected command."""
+        try:
+            item = self.query_one("CommandItem.selected", CommandItem)
+            return item.command
+        except Exception:
+            return None
+
 
 class XFusionTUI(App):
     """The redesigned Timeline-first TUI for XFusion."""
@@ -353,6 +378,28 @@ class XFusionTUI(App):
             yield Static("\n[bold underline]AUDIT LOG[/]")
             yield RichLog(id="side-audit", highlight=True, markup=True)
         yield Footer()
+
+    def on_key(self, event: events.Key) -> None:
+        """Handle global keys for palette navigation."""
+        palette = self.query_one("#command-palette", CommandPalette)
+        if palette.display:
+            if event.key == "up":
+                palette.move_selection(-1)
+                event.prevent_default()
+            elif event.key == "down":
+                palette.move_selection(1)
+                event.prevent_default()
+            elif event.key == "tab":
+                selected = palette.get_selected()
+                if selected:
+                    main_input = self.query_one("#main-input", Input)
+                    main_input.value = f"/{selected.name} "
+                    main_input.focus()
+                event.prevent_default()
+            elif event.key == "escape":
+                palette.display = False
+                self.query_one("#main-input", Input).focus()
+                event.prevent_default()
 
     def on_mount(self) -> None:
         self.command_registry = CommandRegistry()
