@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from rich.console import ConsoleRenderable, Group
+from rich.panel import Panel
 from rich.text import Text
 from textual.widgets import Static
 
-from xfusion.domain.enums import StepStatus
+from xfusion.domain.enums import RiskLevel, StepStatus
 from xfusion.domain.models.execution_plan import PlanStep
 
 STATUS_STYLE = {
@@ -28,7 +30,7 @@ STATUS_SYMBOL = {
 
 
 class StepWidget(Static):
-    """Render one execution step as a compact timeline row."""
+    """Render one execution step as a compact timeline row or expanded panels."""
 
     def __init__(
         self,
@@ -41,8 +43,22 @@ class StepWidget(Static):
         self.step = step
         self.output = output
         self.debug = debug
+        # Auto-expand if risk is medium/high or approval is pending
+        self.expanded = self.step.risk_level in {RiskLevel.MEDIUM, RiskLevel.HIGH} or bool(
+            self.step.approval_id
+        )
 
-    def render(self) -> Text:
+    def on_click(self) -> None:
+        """Toggle expanded state on click."""
+        self.expanded = not self.expanded
+        self.refresh()
+
+    def render(self) -> ConsoleRenderable:
+        if not self.expanded:
+            return self._render_compact()
+        return self._render_expanded()
+
+    def _render_compact(self) -> Text:
         style = STATUS_STYLE.get(self.step.status, "")
         symbol = STATUS_SYMBOL.get(self.step.status, "•")
         risk = self._risk_label()
@@ -68,6 +84,51 @@ class StepWidget(Static):
             self._append_debug_metadata(result)
 
         return result
+
+    def _render_expanded(self) -> Group:
+        # Step Panel
+        step_text = Text()
+        args_str = " ".join(f"{k}={v}" for k, v in self.step.args.items())
+        cmd = f"{self.step.capability} {args_str}".strip()
+        step_text.append("Command\n", style="bold")
+        step_text.append(f"  {cmd}\n\n", style="cyan")
+
+        output = (self.output or {}).get("stdout") or ""
+        if output:
+            step_text.append("Output\n", style="bold")
+            step_text.append(f"  {str(output).strip()}\n\n", style="dim")
+
+        interpretation = (self.output or {}).get("summary") or ""
+        if interpretation:
+            step_text.append("Interpretation\n", style="bold")
+            step_text.append(f"  {str(interpretation).strip()}", style="green")
+
+        step_panel = Panel(
+            step_text,
+            title=f"Step: {self.step.intent or self.step.capability}",
+            title_align="left",
+            border_style="white",
+        )
+
+        # Risk Gate Panel
+        risk_text = Text()
+        risk_label = self._risk_label()
+        risk_text.append("Action: ", style="bold")
+        risk_text.append(f"{self.step.capability}\n", style="yellow")
+        risk_text.append("Risk: ", style="bold")
+        risk_text.append(f"{risk_label}\n", style="red" if risk_label != "low" else "green")
+        risk_text.append("Approval: ", style="bold")
+        approval_style = "bold red" if self.step.approval_id else "green"
+        risk_text.append(f"{self._approval_label()}", style=approval_style)
+
+        risk_panel = Panel(
+            risk_text,
+            title="Risk Gate",
+            title_align="left",
+            border_style="red" if risk_label != "low" or self.step.approval_id else "green",
+        )
+
+        return Group(step_panel, risk_panel)
 
     def _risk_label(self) -> str:
         final_risk = self.step.final_risk_category or self.step.policy_category

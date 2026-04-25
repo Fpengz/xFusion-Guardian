@@ -6,6 +6,7 @@ from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.widgets import Input
 
@@ -97,7 +98,9 @@ def _fallback_step() -> PlanStep:
 
 
 def test_step_widget_normal_mode_renders_compact_showcase_summary():
-    rendered = StepWidget(_fallback_step(), {"summary": "Kernel details captured."}).render().plain
+    widget = StepWidget(_fallback_step(), {"summary": "Kernel details captured."})
+    widget.expanded = False
+    rendered = cast(Text, widget.render()).plain
 
     assert "SUCCESS" in rendered
     assert "shell.fallback" in rendered
@@ -112,7 +115,9 @@ def test_step_widget_normal_mode_renders_compact_showcase_summary():
 def test_step_widget_debug_mode_renders_hybrid_policy_and_runtime_metadata():
     step = _fallback_step()
 
-    rendered = StepWidget(step, {"summary": "Kernel details captured."}, debug=True).render().plain
+    widget = StepWidget(step, {"summary": "Kernel details captured."}, debug=True)
+    widget.expanded = False
+    rendered = cast(Text, widget.render()).plain
 
     assert "Runtime:" in rendered
     assert "surface=restricted_shell" in rendered
@@ -258,7 +263,9 @@ def test_legacy_step_widget_import_still_available():
         ],
     )
 
-    rendered = StepWidget(step, {"summary": "Kernel details captured."}).render().plain
+    widget = StepWidget(step, {"summary": "Kernel details captured."})
+    widget.expanded = False
+    rendered = cast(Text, widget.render()).plain
 
     assert "approval=approved" in rendered
 

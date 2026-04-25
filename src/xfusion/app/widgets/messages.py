@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Static
@@ -19,6 +21,33 @@ class UserMessage(Static):
         super().__init__(f"> {text}", classes="user-message", markup=False)
 
 
+class TaskWidget(Static):
+    """Render the main execution goal as a Task panel."""
+
+    def __init__(self, goal: str) -> None:
+        super().__init__(id="task-widget")
+        self.goal = goal
+
+    def render(self) -> Panel:
+        return Panel(self.goal, title="Task", title_align="left", border_style="blue")
+
+
+class PlanWidget(Static):
+    """Render the execution plan steps as a Plan panel."""
+
+    def __init__(self, plan: ExecutionPlan | None = None) -> None:
+        super().__init__(id="plan-widget")
+        self.plan = plan
+
+    def render(self) -> Panel | Text:
+        if not self.plan:
+            return Text("")
+        text = Text()
+        for idx, step in enumerate(self.plan.steps, start=1):
+            text.append(f"{idx}. {step.intent}\n")
+        return Panel(text, title="Plan", title_align="left", border_style="cyan")
+
+
 class AgentMessage(Static):
     """Structured block for an agent response turn."""
 
@@ -26,7 +55,8 @@ class AgentMessage(Static):
         super().__init__()
         self.state = state
         self.turn_header = Label("Guardian", id="turn-header")
-        self.plan_label = Label("", id="plan-info")
+        self.task_widget = TaskWidget("")
+        self.plan_widget = PlanWidget(None)
         self.steps_container = Vertical(id="steps")
         self.policy_label = Static("", id="policy-info", markup=False)
         self.explanation_container = Vertical(
@@ -38,7 +68,8 @@ class AgentMessage(Static):
 
     def compose(self) -> ComposeResult:
         yield self.turn_header
-        yield self.plan_label
+        yield self.task_widget
+        yield self.plan_widget
         yield self.steps_container
         yield self.policy_label
         yield self.explanation_container
@@ -54,12 +85,16 @@ class AgentMessage(Static):
         self.turn_header.update(self._turn_title(state))
 
         if gateway_mode in {"conversational", "clarify"}:
-            self.plan_label.display = False
+            self.task_widget.display = False
+            self.plan_widget.display = False
         elif isinstance(plan, ExecutionPlan):
-            self.plan_label.update(f"Plan: {plan.goal}")
-            self.plan_label.display = True
+            self.task_widget.goal = plan.goal
+            self.task_widget.display = True
+            self.plan_widget.plan = plan
+            self.plan_widget.display = True
         else:
-            self.plan_label.display = False
+            self.task_widget.display = False
+            self.plan_widget.display = False
 
         self.steps_container.remove_children()
         if not gateway_mode and isinstance(plan, ExecutionPlan):
