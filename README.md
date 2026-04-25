@@ -28,7 +28,9 @@ this order:
   verification contracts.
 - Senses environment facts such as distro, current user, sudo availability,
   systemd availability, package manager, disk pressure, and protected paths.
-- Routes only through registered capabilities, never arbitrary shell passthrough.
+- Routes through reviewed execution surfaces in order: registered capability,
+  structured argv-safe template, then restricted shell fallback with a structured
+  fallback reason.
 - Classifies each planned step into deterministic allow/confirm/deny policy outcomes.
 - Requires approval-bound exact typed confirmation for mutation capabilities.
 - Refuses forbidden operations on protected paths such as `/`, `/etc`, `/usr`,
@@ -57,14 +59,19 @@ Official demo sandbox:
 ## Architecture
 
 The implemented v0.2 follows a LangGraph-orchestrated control loop with
-Pydantic contracts:
+Pydantic contracts. A Conversation Gateway sits before orchestration so only
+explicit operational intent can reach the execution graph:
 
 ```text
-agent proposal
+user input
+  -> conversation gateway
+  -> existing graph only when requires_execution=true
+  -> agent proposal
   -> plan schema validation
   -> dependency/DAG validation
   -> reference validation/resolution
-  -> capability schema validation
+  -> capability/template resolution
+  -> capability schema or template parameter validation
   -> policy decision
   -> approval gate
   -> controlled adapter execution
@@ -78,8 +85,12 @@ Important trust boundary:
 
 - LLMs may support language understanding, ambiguity detection, plan drafting,
   and response wording.
+- The Conversation Gateway uses LLM-assisted classification, but routing is
+  enforced by deterministic contracts. Conversational and clarification turns do
+  not mutate agent state, write execution audit records, or trigger capability,
+  template, or shell execution surfaces.
 - Deterministic Python code owns policy classification, dependency enforcement,
-  reference resolution, capability schema validation, approval validation,
+  reference resolution, capability/template validation, approval validation,
   execution authorization, output redaction, audit state, and verification.
 
 ## Repository Map
@@ -114,7 +125,7 @@ uv run xfusion
 
 ### Interactive TUI & Slash Commands
 
-The interactive TUI provides a modern "Guardian" experience with first-class slash commands and a searchable command palette.
+The interactive TUI provides a compact, theme-aware "Guardian" cockpit with first-class slash commands and a searchable command palette. It keeps audit/debug detail tucked away until requested while preserving the policy-governed execution flow.
 
 - **Trigger Palette**: Type `/` to open the searchable command palette.
 - **Navigation**: Use `Up`/`Down` arrows to navigate commands and `Tab` to autocomplete.
@@ -130,10 +141,17 @@ The interactive TUI provides a modern "Guardian" experience with first-class sla
 #### Session & Info Commands
 - `/sessions`: List saved conversation sessions.
 - `/resume <id>`: Resume a previous session by its ID.
+- `/capabilities`: List reviewed registered capabilities.
+- `/templates`: List reviewed structured command templates.
+- `/audit`: Show recent audit trace records for the current session.
 - `/status`: Show current environment and session metadata.
-- `/permissions`: Display active execution policy and risk thresholds.
+- `/policy`: Display active execution policy and risk thresholds.
 - `/model`: View current LLM provider and model configuration.
 - `/config`: Show effective application settings.
+
+Direct `!` shell execution is intentionally unavailable in the TUI. Describe the
+operation in natural language so XFusion can choose capability, template, or
+restricted shell under policy and approval enforcement.
 
 Run the verification gates:
 
@@ -207,10 +225,12 @@ the dangerous decisions inspectable and controllable.
 ## Status
 
 v0.2 capability-governed execution is implemented and tested. The current
-shipping increment is `v0.2.4.1`, which keeps the v0.2 architecture authoritative
-while adding policy decision normalization, explicit high-risk admin
-confirmation semantics, and execute-time policy integrity binding on registered
-capabilities. The v0.2 spec remains the normative source of truth.
+shipping increment is `v0.2.4.4`, which keeps the v0.2 architecture authoritative
+while adding the agent-led hybrid execution contracts: capability before
+template before restricted shell, `SystemRiskEnvelope`, policy categories,
+structured fallback reasons, and integrity/audit fields for all execution
+surfaces. The v0.2 spec remains the baseline source of truth; the v0.2.4.4 spec
+documents the hybrid execution increment.
 Legacy materials live only in the historical archive and are explicitly
 non-normative.
 
