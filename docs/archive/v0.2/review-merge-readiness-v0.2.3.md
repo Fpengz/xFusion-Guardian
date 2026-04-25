@@ -1,3 +1,8 @@
+> [!IMPORTANT]
+> Historical, non-normative v0.2 material. This document is archived for
+> historical reference only. For all current behavior, use the normative
+> [docs/specs/xfusion-v0.2.md](../../specs/xfusion-v0.2.md).
+
 # XFusion v0.2.3 Review And Merge Readiness
 
 This note packages reviewer-facing artifacts for the v0.2.3 focused execution

@@ -1,3 +1,8 @@
+> [!IMPORTANT]
+> Historical, non-normative v0.2 material. This document is archived for
+> historical reference only. For all current behavior, use the normative
+> [docs/specs/xfusion-v0.2.md](../../specs/xfusion-v0.2.md).
+
 # XFusion v0.2.2 Hardening Release Plan
 
 ## Release Framing
@@ -121,7 +126,7 @@ adversarial/fault classes remains a declared follow-on risk.
 
 - Expand corpus breadth across scenario, invariant, adversarial, and
   fault-injection classes per
-  [docs/verification-dataset-strategy.md](verification-dataset-strategy.md).
+  [docs/verification-dataset-strategy.md](../../verification/verification-dataset-strategy.md).
 - Convert all historical hardening bugs and newly discovered v0.2.2 issues into
   permanent regression cases.
 - Add CI-visible coverage summary for dataset dimensions (fail-closed classes,

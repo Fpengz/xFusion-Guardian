@@ -103,7 +103,7 @@ Important trust boundary:
 - [docs/architecture/schema-subset.md](docs/architecture/schema-subset.md) - quick pointer to the schema subset contract
 - [docs/release-readiness-v0.2.md](docs/release-readiness-v0.2.md) - reviewer notes
 - [docs/release-plan-v0.2.5.md](docs/release-plan-v0.2.5.md) - v0.2.5 release notes and deferred backlog
-- [docs/verification-suite.md](docs/verification-suite.md) - verification suite design
+- [docs/verification/verification-suite.md](docs/verification/verification-suite.md) - verification suite design
 - [docs/archive/v0.1/](docs/archive/v0.1/) - historical, non-normative legacy materials
 - [CHANGELOG.md](CHANGELOG.md) - release notes
 - [verification/scenarios/](verification/scenarios/) - YAML scenario suite

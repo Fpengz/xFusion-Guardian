@@ -75,7 +75,7 @@ Start here:
 
 Supporting docs:
 
-- [docs/verification-suite.md](docs/verification-suite.md): standardized YAML scenario suite.
+- [docs/verification/verification-suite.md](docs/verification/verification-suite.md): standardized YAML scenario suite.
 - [verification/README.md](verification/README.md): verification suite editing guide.
 - [docs/archive/v0.1](docs/archive/v0.1): historical, non-normative legacy materials.
 
