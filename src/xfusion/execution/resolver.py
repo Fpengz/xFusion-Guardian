@@ -1,4 +1,4 @@
-"""Hybrid execution resolver for v0.2.4.4 three-tier model."""
+"""Hybrid execution resolver for v0.2.5 three-tier model."""
 
 from __future__ import annotations
 

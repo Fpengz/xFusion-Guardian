@@ -1,4 +1,4 @@
-"""LLM-driven capability resolver for XFusion v0.2.4.4.
+"""LLM-driven capability resolver for XFusion v0.2.5.
 
 This module implements tool-style capability loading where the LLM acts as the router,
 selecting appropriate capabilities based on natural language input and capability schemas.

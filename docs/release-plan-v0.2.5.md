@@ -1,8 +1,8 @@
-# XFusion v0.2.4 Release Notes
+# XFusion v0.2.5 Release Notes
 
 ## Summary
 
-v0.2.4 is a focused hardening increment that keeps the v0.2 architecture and
+v0.2.5 is a focused hardening increment that keeps the v0.2 architecture and
 registered-capability model intact while improving policy integrity and audit
 machine-readability.
 
@@ -36,7 +36,7 @@ machine-readability.
 - Runtime isolation remains declarative and policy-guarded, not OS-level
   sandboxing.
 
-## Suggested Follow-ons (Post-v0.2.4)
+## Suggested Follow-ons (Post-v0.2.5)
 
 1. Add identity-bound admin confirmation (for example external principal
    attestation) while preserving deterministic approval fingerprints.

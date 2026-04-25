@@ -150,7 +150,7 @@ def test_approval_modal_escape_dismisses_without_phrase():
 
 
 def test_tui_startup_banner_is_compact_not_technical_block():
-    assert "XFusion Guardian v0.2.4.4" not in XFusionTUI.startup_message("normal")
+    assert "XFusion Guardian v0.2.5" not in XFusionTUI.startup_message("normal")
     assert "Working dir:" not in XFusionTUI.startup_message("normal")
     assert "Ready" in XFusionTUI.startup_message("normal")
 

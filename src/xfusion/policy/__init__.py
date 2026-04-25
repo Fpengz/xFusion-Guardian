@@ -1,4 +1,4 @@
-"""Policy module for XFusion v0.2.4.4."""
+"""Policy module for XFusion v0.2.5."""
 
 from xfusion.policy.categories import (
     PolicyCategory,

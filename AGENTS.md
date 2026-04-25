@@ -68,9 +68,9 @@ Start here:
 - [README.md](README.md): short project overview and development commands.
 - [docs/specs/xfusion-v0.2.md](docs/specs/xfusion-v0.2.md): normative v0.2 spec.
 - [docs/architecture/capability-schema.md](docs/architecture/capability-schema.md): XFusion Capability Schema contract.
-- [docs/architecture/execution-policy-v0.2.4.md](docs/architecture/execution-policy-v0.2.4.md): current policy integrity and confirmation semantics.
+- [docs/architecture/execution-policy-v0.2.5.md](docs/architecture/execution-policy-v0.2.5.md): current policy integrity and confirmation semantics.
 - [docs/release-readiness-v0.2.md](docs/release-readiness-v0.2.md): reviewer notes.
-- [docs/release-plan-v0.2.4.md](docs/release-plan-v0.2.4.md): v0.2.4 release notes and deferred follow-ons.
+- [docs/release-plan-v0.2.5.md](docs/release-plan-v0.2.5.md): v0.2.5 release notes and deferred follow-ons.
 - [problem_statement.pdf](problem_statement.pdf): original contest problem statement.
 
 Supporting docs:

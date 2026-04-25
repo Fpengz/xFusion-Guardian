@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.2.5 - 2026-04-25
+
+- Implemented Controlled Execution Platform with hybrid manifest capability engine.
+- Introduced Prompt OS for structured, deterministic system prompts with
+  context-aware module selection.
+- Enhanced audit records with prompt explainability and record tracking.
+- Added comprehensive YAML-based capability catalog and manifest system.
+
 ## v0.2.4.4 - 2026-04-25
 
 - Implemented Conversation Gateway for intent-based classification and

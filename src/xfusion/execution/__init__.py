@@ -1,4 +1,4 @@
-"""Execution module for XFusion v0.2.4.4."""
+"""Execution module for XFusion v0.2.5."""
 
 from xfusion.execution.resolver import (
     ExecutionOutcome,

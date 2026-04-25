@@ -1,8 +1,8 @@
-# XFusion v0.2.4 Execution Policy Integrity
+# XFusion v0.2.5 Execution Policy Integrity
 
-This document describes the focused v0.2.4 hardening increment on top of v0.2.3.
+This document describes the focused v0.2.5 hardening increment on top of v0.2.3.
 
-v0.2.4 keeps the same deterministic, registered-capability execution model and
+v0.2.5 keeps the same deterministic, registered-capability execution model and
 adds stronger machine-readable policy normalization plus execute-time integrity
 binding.
 
@@ -27,7 +27,7 @@ The step risk contract also carries normalized fields:
 
 ## Risk Semantics
 
-v0.2.4 enforces deterministic risk semantics:
+v0.2.5 enforces deterministic risk semantics:
 
 - `low` -> `allow`
 - `medium` -> `require_confirmation` with `confirmation_type=user`
@@ -68,7 +68,7 @@ dependencies, policy state, or normalized invocation materially change.
 
 ## Multi-Step / Cross-Turn Guarantees
 
-v0.2.4 enforces the following invariants:
+v0.2.5 enforces the following invariants:
 
 1. Policy is rechecked at execute time for every step.
 2. A step approved under one snapshot cannot execute under a changed snapshot.
