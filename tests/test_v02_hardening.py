@@ -31,7 +31,9 @@ from xfusion.planning.validator import validate_plan
 from xfusion.policy.rules import evaluate_policy
 from xfusion.roles.contracts import RoleProposal, validate_role_proposal
 from xfusion.tools.base import ToolOutput
+from xfusion.tools.disk import DiskTools
 from xfusion.tools.process import ProcessTools
+from xfusion.tools.registry import ToolRegistry
 from xfusion.tools.system import SystemTools
 
 SECRET = "password=supersecret token=abcdef1234567890"
@@ -111,6 +113,41 @@ def test_system_current_user_output_matches_registered_contract() -> None:
     output = SystemTools(FakeRunner()).current_user()
 
     assert output.data == {"username": "operator"}
+
+
+def test_system_detect_os_output_matches_registered_contract() -> None:
+    runner = RoutingFakeRunner(
+        {
+            ("cat", "/etc/os-release"): CommandResult(
+                stdout='ID=ubuntu\nVERSION_ID="25.10"\n',
+                stderr="",
+                exit_code=0,
+            ),
+            ("sudo", "-n", "true"): CommandResult(stdout="", stderr="", exit_code=0),
+            ("df", "/", "--output=pcent"): CommandResult(
+                stdout="Use%\n12%\n",
+                stderr="",
+                exit_code=0,
+            ),
+        }
+    )
+    registry = ToolRegistry(SystemTools(runner), DiskTools(runner), ProcessTools(runner))
+    capability = build_default_capability_registry().require("system.detect_os")
+
+    outcome = ControlledAdapterRuntime(registry).execute(
+        capability=capability,
+        normalized_args={},
+    )
+
+    assert outcome.status == "succeeded"
+    assert outcome.normalized_output["distro_family"] == "ubuntu"
+    assert outcome.normalized_output["protected_paths"] == [
+        "/",
+        "/etc",
+        "/boot",
+        "/usr",
+        "/var/lib",
+    ]
 
 
 def test_system_check_ram_uses_linux_free_when_available() -> None:

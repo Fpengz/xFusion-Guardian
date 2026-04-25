@@ -80,7 +80,7 @@ class SystemTools:
 
         return ToolOutput(
             summary=f"Detected {state.distro_family} {state.distro_version} environment.",
-            data=state.model_dump(),
+            data=state.model_dump(mode="json"),
         )
 
     def check_ram(self) -> ToolOutput:
