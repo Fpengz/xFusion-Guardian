@@ -189,6 +189,45 @@ def build_default_capability_registry() -> CapabilityRegistry:
             ),
         ),
         _capability(
+            name="system.service_start",
+            verb="start",
+            object_name="service",
+            risk_tier=RiskTier.TIER_1,
+            approval_mode=ApprovalMode.HUMAN,
+            is_read_only=False,
+            input_schema=_schema({"service": _string(max_length=128)}, ["service"]),
+            output_schema=_schema(
+                {"service": _string(max_length=128), "status": _string(max_length=64)}
+            ),
+            verification_recommendation="state_re_read",
+        ),
+        _capability(
+            name="system.service_stop",
+            verb="stop",
+            object_name="service",
+            risk_tier=RiskTier.TIER_1,
+            approval_mode=ApprovalMode.HUMAN,
+            is_read_only=False,
+            input_schema=_schema({"service": _string(max_length=128)}, ["service"]),
+            output_schema=_schema(
+                {"service": _string(max_length=128), "status": _string(max_length=64)}
+            ),
+            verification_recommendation="state_re_read",
+        ),
+        _capability(
+            name="system.service_restart",
+            verb="restart",
+            object_name="service",
+            risk_tier=RiskTier.TIER_1,
+            approval_mode=ApprovalMode.HUMAN,
+            is_read_only=False,
+            input_schema=_schema({"service": _string(max_length=128)}, ["service"]),
+            output_schema=_schema(
+                {"service": _string(max_length=128), "status": _string(max_length=64)}
+            ),
+            verification_recommendation="state_re_read",
+        ),
+        _capability(
             name="disk.check_usage",
             verb="read",
             object_name="disk",

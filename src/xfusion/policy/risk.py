@@ -167,12 +167,18 @@ def classify_risk_traits(
     )
     mutation = not read_only and not cleanup_preview
 
-    process_control = name in {"process.kill", "system.service_restart", "system.service_stop"}
+    process_control = name in {
+        "process.kill",
+        "system.service_restart",
+        "system.service_stop",
+        "system.service_start",
+    }
     filesystem_mutation = name in {
         "cleanup.safe_disk_cleanup",
         "file.write_file",
         "file.delete",
         "file.move",
+        "file.copy",
         "file.chmod",
         "file.chown",
     }
@@ -187,6 +193,9 @@ def classify_risk_traits(
         "user.create",
         "user.delete",
         "cleanup.safe_disk_cleanup",
+        "system.service_start",
+        "system.service_stop",
+        "system.service_restart",
     }
 
     data_destructive = False

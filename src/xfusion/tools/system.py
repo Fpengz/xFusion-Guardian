@@ -125,3 +125,42 @@ class SystemTools:
                 data={"service": service, "status": "unavailable"},
             )
         raise subprocess.SubprocessError(stderr or f"Could not inspect service {service}.")
+
+    def service_start(self, service: str) -> ToolOutput:
+        """Start a service using systemctl."""
+        res = self.runner.run(["sudo", "systemctl", "start", service])
+        if res.exit_code == 0:
+            return ToolOutput(
+                summary=f"Started service {service}.",
+                data={"service": service, "status": "started"},
+            )
+        return ToolOutput(
+            summary=f"Failed to start service {service}: {res.stderr}",
+            data={"error": res.stderr},
+        )
+
+    def service_stop(self, service: str) -> ToolOutput:
+        """Stop a service using systemctl."""
+        res = self.runner.run(["sudo", "systemctl", "stop", service])
+        if res.exit_code == 0:
+            return ToolOutput(
+                summary=f"Stopped service {service}.",
+                data={"service": service, "status": "stopped"},
+            )
+        return ToolOutput(
+            summary=f"Failed to stop service {service}: {res.stderr}",
+            data={"error": res.stderr},
+        )
+
+    def service_restart(self, service: str) -> ToolOutput:
+        """Restart a service using systemctl."""
+        res = self.runner.run(["sudo", "systemctl", "restart", service])
+        if res.exit_code == 0:
+            return ToolOutput(
+                summary=f"Restarted service {service}.",
+                data={"service": service, "status": "restarted"},
+            )
+        return ToolOutput(
+            summary=f"Failed to restart service {service}: {res.stderr}",
+            data={"error": res.stderr},
+        )
