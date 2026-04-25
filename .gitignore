@@ -1,21 +1,70 @@
-.venv/
-.env
-.env.*
-!.env.example
-.pytest_cache/
-.ruff_cache/
-.ty/
-.mypy_cache/
-.pyre/
-.coverage
-htmlcov/
+```
+# Compiled and build artifacts
+*.pyc
 __pycache__/
-*.py[cod]
-*.egg-info/
-audit.jsonl
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.exe
+*.class
+
+# Dependencies
+.venv/
+venv/
+.env
+.env.local
+.env.*
+
+# Logs and temp files
 *.log
+*.tmp
+*.swp
+*.swo
+
+# Editors
+.vscode/
+.idea/
+
+# Build and distribution
 dist/
 build/
+target/
+*.egg-info/
+
+# Testing and coverage
+.coverage
+coverage/
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# OS generated files
 .DS_Store
-.idea/
-.vscode/
+Thumbs.db
+
+# Compressed files
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
+```
