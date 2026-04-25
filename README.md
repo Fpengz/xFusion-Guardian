@@ -59,10 +59,14 @@ Official demo sandbox:
 ## Architecture
 
 The implemented v0.2 follows a LangGraph-orchestrated control loop with
-Pydantic contracts:
+Pydantic contracts. A Conversation Gateway sits before orchestration so only
+explicit operational intent can reach the execution graph:
 
 ```text
-agent proposal
+user input
+  -> conversation gateway
+  -> existing graph only when requires_execution=true
+  -> agent proposal
   -> plan schema validation
   -> dependency/DAG validation
   -> reference validation/resolution
@@ -81,6 +85,10 @@ Important trust boundary:
 
 - LLMs may support language understanding, ambiguity detection, plan drafting,
   and response wording.
+- The Conversation Gateway uses LLM-assisted classification, but routing is
+  enforced by deterministic contracts. Conversational and clarification turns do
+  not mutate agent state, write execution audit records, or trigger capability,
+  template, or shell execution surfaces.
 - Deterministic Python code owns policy classification, dependency enforcement,
   reference resolution, capability/template validation, approval validation,
   execution authorization, output redaction, audit state, and verification.
@@ -117,7 +125,7 @@ uv run xfusion
 
 ### Interactive TUI & Slash Commands
 
-The interactive TUI provides a modern "Guardian" experience with first-class slash commands and a searchable command palette.
+The interactive TUI provides a compact, theme-aware "Guardian" cockpit with first-class slash commands and a searchable command palette. It keeps audit/debug detail tucked away until requested while preserving the policy-governed execution flow.
 
 - **Trigger Palette**: Type `/` to open the searchable command palette.
 - **Navigation**: Use `Up`/`Down` arrows to navigate commands and `Tab` to autocomplete.

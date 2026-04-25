@@ -2,11 +2,15 @@
 
 ## Summary
 
-XFusion v0.2.4.3 introduces an agent-led hybrid execution model. Agents perform
-intent interpretation, execution-surface selection, risk and impact assessment,
-and progressive-hardening recommendations. The system remains authoritative for
-validation, structural risk ceilings, approval, execution constraints, integrity
-binding, redaction, verification, and audit.
+XFusion v0.2.4.3 introduces a Conversation Gateway before orchestration and an
+agent-led hybrid execution model inside operational flows. The gateway classifies
+user input as conversational, clarification-required, or operational before the
+LangGraph pipeline can run. Agents perform intent interpretation,
+execution-surface selection, risk and impact assessment, and
+progressive-hardening recommendations only after the gateway has authorized an
+operational route. The system remains authoritative for validation, structural
+risk ceilings, approval, execution constraints, integrity binding, redaction,
+verification, and audit.
 
 The guiding rule is:
 
@@ -16,6 +20,48 @@ Agents decide how to act; the system decides whether the action is allowed.
 
 This version intentionally expands beyond the v0.2 registered-capability-only
 surface while preserving deterministic enforcement at the trust boundary.
+
+## Conversation Gateway
+
+Every natural-language turn first passes through a deterministic routing layer
+with LLM-assisted semantic classification:
+
+```text
+User input
+  -> Conversation Gateway
+      -> conversational: direct response, no orchestration
+      -> clarify: structured clarification response, no orchestration
+      -> operational: existing agent graph and execution pipeline
+```
+
+The gateway emits an `IntentDecision`:
+
+- `mode`: `conversational`, `operational`, or `clarify`
+- `requires_execution`: boolean execution gate
+- `confidence`: classifier confidence from `0.0` to `1.0`
+- `rationale`: short classifier rationale
+- `clarification`: required when `mode=clarify`
+
+Structured clarification responses use:
+
+- `question`
+- `missing_fields`
+- `risk_hint`
+
+Routing enforcement is fail-closed:
+
+- `operational` must set `requires_execution=true`.
+- `conversational` and `clarify` must set `requires_execution=false`.
+- `clarify` must include a structured clarification response.
+- confidence below `0.75`, malformed classifier output, LLM failure, invalid
+  modes, missing required fields, or inconsistent execution flags force
+  `mode=clarify` and `requires_execution=false`.
+- only `mode=operational` with `requires_execution=true` may enter the existing
+  orchestration layer.
+
+Conversational and clarification turns are intentionally side-effect free: they
+must not mutate `AgentGraphState`, create an `ExecutionPlan`, write execution
+audit records, resolve execution surfaces, or call adapters.
 
 ## Execution Surfaces
 
