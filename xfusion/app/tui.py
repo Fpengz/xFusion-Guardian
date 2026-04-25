@@ -538,7 +538,7 @@ class XFusionTUI(App):
         # Technical banner
         response_mode = str(self.state["response_mode"])
         banner = f"""[cyan]────────────────────────────────
-XFusion Guardian v0.2.4.2
+XFusion Guardian v0.2.4.3
 Connected to: local runtime
 Working dir: {os.getcwd()}
 Mode: {response_mode.upper()} (approval required)

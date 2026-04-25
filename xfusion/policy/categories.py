@@ -1,4 +1,4 @@
-"""Policy categories for v0.2.4.2 hybrid execution model."""
+"""Policy categories for v0.2.4.3 hybrid execution model."""
 
 from __future__ import annotations
 

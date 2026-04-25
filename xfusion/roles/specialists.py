@@ -1,4 +1,4 @@
-"""Specialist agents for XFusion v0.2.4.2.
+"""Specialist agents for XFusion v0.2.4.3.
 
 This module transforms reasoning roles into specialist agents with domain-specific expertise.
 Each agent encapsulates knowledge, decision logic, and proposal generation for its specialty.

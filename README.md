@@ -217,11 +217,11 @@ the dangerous decisions inspectable and controllable.
 ## Status
 
 v0.2 capability-governed execution is implemented and tested. The current
-shipping increment is `v0.2.4.2`, which keeps the v0.2 architecture authoritative
+shipping increment is `v0.2.4.3`, which keeps the v0.2 architecture authoritative
 while adding the agent-led hybrid execution contracts: capability before
 template before restricted shell, `SystemRiskEnvelope`, policy categories,
 structured fallback reasons, and integrity/audit fields for all execution
-surfaces. The v0.2 spec remains the baseline source of truth; the v0.2.4.2 spec
+surfaces. The v0.2 spec remains the baseline source of truth; the v0.2.4.3 spec
 documents the hybrid execution increment.
 Legacy materials live only in the historical archive and are explicitly
 non-normative.
