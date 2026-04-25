@@ -117,25 +117,27 @@ def test_plan_step_rejects_legacy_alias_fields_fail_closed() -> None:
 
 def test_capability_definition_is_code_defined_and_extra_forbid() -> None:
     with pytest.raises(ValidationError):
-        CapabilityDefinition(
-            name="unsafe",
-            version=1,
-            verb="execute",
-            object="shell",
-            risk_tier=RiskTier.TIER_3,
-            approval_mode=ApprovalMode.DENY,
-            allowed_environments=["dev"],
-            allowed_actor_types=["assistant"],
-            scope_model={},
-            input_schema={"type": "object"},
-            output_schema={"type": "object"},
-            runtime_constraints=RuntimeConstraints(),
-            adapter_id="unsafe.shell",
-            is_read_only=False,
-            preview_builder="default",
-            verification_recommendation="none",
-            redaction_policy="standard",
-            **{"command": "bash"},
+        CapabilityDefinition.model_validate(
+            {
+                "name": "unsafe",
+                "version": 1,
+                "verb": "execute",
+                "object": "shell",
+                "risk_tier": RiskTier.TIER_3,
+                "approval_mode": ApprovalMode.DENY,
+                "allowed_environments": ["dev"],
+                "allowed_actor_types": ["assistant"],
+                "scope_model": {},
+                "input_schema": {"type": "object"},
+                "output_schema": {"type": "object"},
+                "runtime_constraints": RuntimeConstraints(),
+                "adapter_id": "unsafe.shell",
+                "is_read_only": False,
+                "preview_builder": "default",
+                "verification_recommendation": "none",
+                "redaction_policy": "standard",
+                "command": "bash",
+            }
         )
 
 

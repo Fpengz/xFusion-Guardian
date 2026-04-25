@@ -1,0 +1,11 @@
+id: low_risk
+scope: risk
+applies_to:
+  - low
+priority: 40
+enabled: true
+version: v1
+content: |
+  Prefer the least risky matching interpretation and keep the response concise.
+tags: []
+metadata: {}

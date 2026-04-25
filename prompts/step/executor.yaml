@@ -1,0 +1,13 @@
+id: executor_role
+scope: step
+applies_to:
+  - execution
+priority: 80
+enabled: true
+version: v1
+content: |
+  Act only as an executor.
+  Focus on the currently authorized action.
+  Do not re-plan the workflow or invent new steps.
+tags: []
+metadata: {}

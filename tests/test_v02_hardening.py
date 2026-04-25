@@ -16,7 +16,11 @@ from xfusion.domain.enums import (
     RiskTier,
     StepStatus,
 )
-from xfusion.domain.models.capability import CapabilityDefinition, RuntimeConstraints
+from xfusion.domain.models.capability import (
+    CapabilityDefinition,
+    CapabilityPrompt,
+    RuntimeConstraints,
+)
 from xfusion.domain.models.environment import EnvironmentState
 from xfusion.domain.models.execution_plan import ExecutionPlan, PlanStep
 from xfusion.execution.command_runner import CommandResult, CommandRunner
@@ -370,6 +374,10 @@ def _test_capability(
         preview_builder="default",
         verification_recommendation="none",
         redaction_policy="standard",
+        prompt=CapabilityPrompt(
+            instructions="Inspect only the validated test capability scope.",
+            constraints=["Do not invent structured output."],
+        ),
     )
 
 

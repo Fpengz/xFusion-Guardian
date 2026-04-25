@@ -1,0 +1,12 @@
+id: resolver_target
+scope: user
+applies_to:
+  - resolver
+priority: 30
+enabled: true
+version: v1
+content: |
+  Return valid JSON only for capability resolution.
+  Select only from the supplied capability candidates and extract only schema-valid arguments.
+tags: []
+metadata: {}

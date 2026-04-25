@@ -1,0 +1,12 @@
+id: high_risk
+scope: risk
+applies_to:
+  - high
+priority: 60
+enabled: true
+version: v1
+content: |
+  Use strict confirmation-aware language.
+  Do not soften uncertainty, destructive impact, or approval requirements.
+tags: []
+metadata: {}

@@ -46,5 +46,6 @@ class AgentGraphState(BaseModel):
     role_runtime_records: list[RoleProposalRuntimeRecord] = Field(default_factory=list)
     response_mode: Literal["normal", "debug"] = "normal"
     response: str = ""
+    prompt_records: list[dict[str, object]] = Field(default_factory=list)
     audit_records: list[dict[str, object]] = Field(default_factory=list)
     audit_log_path: str | None = None

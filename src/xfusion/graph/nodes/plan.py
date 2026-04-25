@@ -75,12 +75,22 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
     llm_client = LLMClient(settings) if settings.llm_base_url else None
 
     # Use LLM to resolve intent to capability
-    capability_name, extracted_args, clarification = resolve_intent_to_capability(
+    resolution = resolve_intent_to_capability(
         user_input=state.user_input,
         registry=registry,
         llm_client=llm_client,
         language=state.language or "en",
     )
+    capability_name = resolution.capability_name
+    extracted_args = resolution.arguments
+    clarification = resolution.clarification_question
+    if resolution.prompt_build is not None:
+        state.prompt_records.append(
+            {
+                "source": "resolver",
+                **resolution.prompt_build.model_dump(mode="json"),
+            }
+        )
 
     steps = []
     goal = state.user_input
@@ -375,7 +385,7 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
                     f"Execute {capability_name} with resolved parameters.",
                 ),
                 capability=capability_name,
-                args=extracted_args or {},
+                args=extracted_args,
             )
         )
 

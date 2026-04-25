@@ -34,6 +34,7 @@ class AuditLogger:
         resolution_record: dict[str, object] | None = None,
         fallback_reason: str | None = None,
         integrity_hashes: dict[str, object] | None = None,
+        prompt_records: list[dict[str, object]] | None = None,
     ) -> None:
         """Create and write one audit record."""
         record = AuditRecord(
@@ -58,5 +59,6 @@ class AuditLogger:
             resolution_record=resolution_record or {},
             fallback_reason=fallback_reason,
             integrity_hashes=integrity_hashes or {},
+            prompt_records=prompt_records or [],
         )
         self.sink.write(record)

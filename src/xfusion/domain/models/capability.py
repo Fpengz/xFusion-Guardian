@@ -7,6 +7,15 @@ from pydantic import BaseModel, ConfigDict, Field
 from xfusion.domain.enums import ApprovalMode, RiskTier
 
 
+class CapabilityPrompt(BaseModel):
+    """Capability-scoped prompt metadata."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    instructions: str = Field(min_length=1)
+    constraints: list[str] = Field(default_factory=list)
+
+
 class RuntimeConstraints(BaseModel):
     """Deterministic runtime limits for one capability adapter."""
 
@@ -42,3 +51,9 @@ class CapabilityDefinition(BaseModel):
     preview_builder: str = Field(min_length=1)
     verification_recommendation: str = Field(min_length=1)
     redaction_policy: str = Field(min_length=1)
+    short_description: str = ""
+    target_constraints: dict[str, Any] = Field(default_factory=dict)
+    execution_binding: dict[str, Any] = Field(default_factory=dict)
+    verification: dict[str, Any] = Field(default_factory=dict)
+    side_effect_classification: str = "none"
+    prompt: CapabilityPrompt

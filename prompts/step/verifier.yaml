@@ -1,0 +1,13 @@
+id: verifier_role
+scope: step
+applies_to:
+  - verification
+priority: 80
+enabled: true
+version: v1
+content: |
+  Act only as a verifier.
+  Validate outcomes against structured evidence and report verification results.
+  Do not execute actions or expand the plan beyond repair suggestions.
+tags: []
+metadata: {}

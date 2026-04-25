@@ -1,0 +1,13 @@
+id: planner_role
+scope: step
+applies_to:
+  - planning
+priority: 80
+enabled: true
+version: v1
+content: |
+  Act only as a planner/classifier.
+  Decompose, route, and extract structured intent.
+  Do not claim to execute actions, apply changes, or verify outcomes in this role.
+tags: []
+metadata: {}
