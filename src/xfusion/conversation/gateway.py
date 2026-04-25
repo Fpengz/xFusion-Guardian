@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from xfusion.app.settings import Settings
 from xfusion.llm.client import LLMClient
+from xfusion.prompts import PromptContext, PromptRegistry, build_prompt
+from xfusion.prompts.prompt_composer import PromptBuildResult
+from xfusion.prompts.prompt_registry import PromptRegistryError
 from xfusion.security.redaction import redact_text
 
 logger = logging.getLogger(__name__)
@@ -46,6 +50,7 @@ class IntentDecision(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     rationale: str = Field(min_length=1)
     clarification: ClarificationResponse | None = None
+    prompt_build: PromptBuildResult | None = None
 
     @model_validator(mode="after")
     def enforce_execution_contract(self) -> IntentDecision:
@@ -67,6 +72,7 @@ class IntentDecision(BaseModel):
         missing_fields: list[str] | None = None,
         risk_hint: str | None = "Uncertain intent cannot enter the execution pipeline.",
         rationale: str = "Gateway could not confidently classify the request.",
+        prompt_build: PromptBuildResult | None = None,
     ) -> IntentDecision:
         return cls(
             mode="clarify",
@@ -78,6 +84,7 @@ class IntentDecision(BaseModel):
                 missing_fields=missing_fields or [CLARIFY_MISSING_FIELDS],
                 risk_hint=risk_hint,
             ),
+            prompt_build=prompt_build,
         )
 
     @classmethod
@@ -93,9 +100,16 @@ class IntentDecision(BaseModel):
 class ConversationGateway:
     """Pre-orchestration routing layer with LLM-assisted classification."""
 
-    def __init__(self, llm_client: Any | None = None, *, config_missing: bool = False) -> None:
+    def __init__(
+        self,
+        llm_client: Any | None = None,
+        *,
+        config_missing: bool = False,
+        prompts_root: str | Path | None = None,
+    ) -> None:
         self.llm_client = llm_client
         self.config_missing = config_missing
+        self.prompt_registry = PromptRegistry(prompts_root) if prompts_root else None
 
     @classmethod
     def from_settings(cls, settings: Settings) -> ConversationGateway:
@@ -117,7 +131,27 @@ class ConversationGateway:
             return IntentDecision.configuration_required()
 
         redacted_input, _meta = redact_text(user_input)
-        system_prompt = _gateway_system_prompt()
+        try:
+            prompt_build = build_prompt(
+                ctx=PromptContext(
+                    step_type="planning",
+                    capability=None,
+                    risk_level="low",
+                    project_context={"prompt_targets": ["gateway"]},
+                ),
+                registry=self.prompt_registry,
+            )
+        except (PromptRegistryError, ValueError):
+            logger.warning(
+                "conversation_gateway.fail_closed reason=prompt_build_error",
+                exc_info=True,
+            )
+            return IntentDecision.fail_closed(
+                rationale="Gateway prompt construction failed.",
+                risk_hint="Execution routing is disabled until prompt construction succeeds.",
+            )
+
+        system_prompt = prompt_build.system_prompt
         user_prompt = (
             f"Language: {language}\n"
             f"User input: {redacted_input}\n\n"
@@ -135,19 +169,19 @@ class ConversationGateway:
             logger.debug("conversation_gateway.llm_output raw=%s", redacted_raw)
             payload = _parse_json_object(raw)
             logger.debug("conversation_gateway.parsed_output keys=%s", sorted(payload.keys()))
-            decision = IntentDecision.model_validate(payload)
+            decision = IntentDecision.model_validate({**payload, "prompt_build": prompt_build})
         except (ValidationError, ValueError, TypeError, json.JSONDecodeError, KeyError):
             logger.warning(
                 "conversation_gateway.fail_closed reason=classification_error",
                 exc_info=True,
             )
-            return IntentDecision.fail_closed()
+            return IntentDecision.fail_closed(prompt_build=prompt_build)
         except Exception:
             logger.warning(
                 "conversation_gateway.fail_closed reason=llm_error",
                 exc_info=True,
             )
-            return IntentDecision.fail_closed()
+            return IntentDecision.fail_closed(prompt_build=prompt_build)
 
         if decision.confidence < CONFIDENCE_THRESHOLD:
             logger.warning(
@@ -181,6 +215,7 @@ class ConversationGateway:
                     f"Gateway confidence {decision.confidence:.2f} is below "
                     f"{CONFIDENCE_THRESHOLD:.2f}."
                 ),
+                prompt_build=prompt_build,
             )
 
         logger.info(
@@ -204,22 +239,3 @@ def _parse_json_object(raw: str) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise ValueError("gateway output must be a JSON object")
     return parsed
-
-
-def _gateway_system_prompt() -> str:
-    return """You are the Conversation Gateway for XFusion.
-Classify the user input before any orchestration or execution pipeline runs.
-
-Modes:
-- conversational: greetings, help, meta chat, or non-actionable messages.
-- operational: clear, explicit Linux/system operation requests.
-- clarify: ambiguous, underspecified, risky, or uncertain requests.
-
-Rules:
-- Return valid JSON only.
-- Include mode, requires_execution, confidence, and rationale.
-- operational MUST set requires_execution=true.
-- conversational and clarify MUST set requires_execution=false.
-- clarify MUST include clarification with question, missing_fields, and optional risk_hint.
-- If unsure, use clarify.
-"""

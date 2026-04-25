@@ -1,0 +1,12 @@
+id: gateway_target
+scope: user
+applies_to:
+  - gateway
+priority: 30
+enabled: true
+version: v1
+content: |
+  Return valid JSON only for the IntentDecision contract.
+  Use conversational, operational, or clarify exactly as defined by the schema.
+tags: []
+metadata: {}

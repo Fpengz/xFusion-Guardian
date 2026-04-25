@@ -73,6 +73,13 @@ def test_refusal_response_contains_normal_contract_sections() -> None:
 def test_debug_response_contains_internal_sections() -> None:
     state = make_graph_state("check disk usage")
     state["response_mode"] = "debug"
+    state["prompt_records"] = [
+        {
+            "source": "resolver",
+            "selected_modules": [{"id": "safety_guard"}, {"id": "planner_role"}],
+            "final_sections": ["GLOBAL SAFETY", "ROLE: PLANNER"],
+        }
+    ]
     runner = CommandRunner()
     system_tools = SystemTools(runner)
     registry = ToolRegistry(system_tools, DiskTools(runner), ProcessTools(runner))
@@ -85,6 +92,7 @@ def test_debug_response_contains_internal_sections() -> None:
     assert "Plan:" in response
     assert "Risk:" in response
     assert "Action:" in response
+    assert "Prompt OS:" in response
     assert "Command Trace:" in response
     assert "Verification:" in response
     assert "State:" in response
@@ -93,7 +101,36 @@ def test_debug_response_contains_internal_sections() -> None:
 
 def test_jsonl_audit_file_receives_step_records(tmp_path) -> None:
     audit_path = tmp_path / "audit.jsonl"
-    state = make_graph_state("check disk usage", audit_log_path=str(audit_path))
+    runner = CommandRunner()
+    system_tools = SystemTools(runner)
+    registry = ToolRegistry(system_tools, DiskTools(runner), ProcessTools(runner))
+    graph = build_agent_graph(registry).compile()
+
+    state = graph.invoke(
+        {
+            "user_input": "check disk usage",
+            "environment": EnvironmentState(distro_family="ubuntu", sudo_available=True),
+            "language": "en",
+            "plan": None,
+            "current_step_id": None,
+            "policy_decision": None,
+            "verification_result": None,
+            "last_tool_output": None,
+            "step_outputs": {},
+            "pending_confirmation_phrase": None,
+            "response": "",
+            "prompt_records": [
+                {
+                    "source": "resolver",
+                    "selected_modules": [{"id": "safety_guard"}, {"id": "planner_role"}],
+                    "final_sections": ["GLOBAL SAFETY", "ROLE: PLANNER"],
+                }
+            ],
+            "audit_records": [],
+            "audit_log_path": str(audit_path),
+            "response_mode": "normal",
+        }
+    )
 
     assert state["plan"].interaction_state == InteractionState.COMPLETED
     lines = audit_path.read_text(encoding="utf-8").splitlines()
@@ -107,6 +144,7 @@ def test_jsonl_audit_file_receives_step_records(tmp_path) -> None:
     assert record["after_state"]
     assert record["verification_result"]["success"] is True
     assert record["status"] == "success"
+    assert record["prompt_records"][0]["source"] == "resolver"
 
 
 def test_jsonl_audit_file_receives_refusal_records(tmp_path) -> None:

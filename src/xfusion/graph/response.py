@@ -199,6 +199,7 @@ def _format_debug_response(
         if source_record and source_record.get("interpreted_intent")
         else plan.goal
     )
+    prompt_summary = _prompt_summary(state)
     return "\n".join(
         [
             f"Intent: {intent}",
@@ -212,6 +213,7 @@ def _format_debug_response(
             f"Plan: {len(plan.steps)} step(s): {plan_tools}",
             f"Risk: {risk} - {risk_reason}",
             f"Action: {action}",
+            f"Prompt OS: {prompt_summary}",
             f"Command Trace: {_format_trace_for_debug(source_record)}",
             f"Verification: {verification}",
             f"Audit: explanation derived from authoritative audit status={audit_status}",
@@ -219,6 +221,17 @@ def _format_debug_response(
             f"Next: {next_step}",
         ]
     )
+
+
+def _prompt_summary(state: AgentGraphState) -> str:
+    if not state.prompt_records:
+        return "No prompt records."
+    latest = state.prompt_records[-1]
+    sections = latest.get("final_sections", [])
+    selected = latest.get("selected_modules", [])
+    if isinstance(sections, list) and isinstance(selected, list):
+        return f"{len(selected)} modules across {len(sections)} sections."
+    return "Prompt explainability recorded."
 
 
 def _result_summary(state: AgentGraphState, source_record: dict[str, object] | None) -> str:

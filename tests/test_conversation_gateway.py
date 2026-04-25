@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 
 import pytest
 
@@ -192,3 +193,114 @@ def test_gateway_logs_fail_closed_reason(caplog: pytest.LogCaptureFixture) -> No
     messages = "\n".join(record.getMessage() for record in caplog.records)
     assert "conversation_gateway.fail_closed" in messages
     assert "classification_error" in messages
+
+
+def test_gateway_uses_structured_prompt_os_system_prompt(tmp_path: Path) -> None:
+    prompts_root = tmp_path / "prompts"
+    (prompts_root / "global").mkdir(parents=True)
+    (prompts_root / "step").mkdir(parents=True)
+    (prompts_root / "risk").mkdir(parents=True)
+    (prompts_root / "user").mkdir(parents=True)
+    (prompts_root / "global" / "safety_guard.yaml").write_text(
+        """
+id: safety_guard
+scope: global
+applies_to: []
+priority: 100
+enabled: true
+version: v1
+content: Never bypass deterministic policy.
+tags: [required, safety]
+metadata: {}
+""",
+        encoding="utf-8",
+    )
+    (prompts_root / "step" / "planner.yaml").write_text(
+        """
+id: planner_role
+scope: step
+applies_to: [planning]
+priority: 50
+enabled: true
+version: v1
+content: Classify only. Do not execute.
+tags: []
+metadata: {}
+""",
+        encoding="utf-8",
+    )
+    (prompts_root / "risk" / "low.yaml").write_text(
+        """
+id: low_risk
+scope: risk
+applies_to: [low]
+priority: 20
+enabled: true
+version: v1
+content: Keep the response concise and deterministic.
+tags: []
+metadata: {}
+""",
+        encoding="utf-8",
+    )
+    (prompts_root / "user" / "gateway.yaml").write_text(
+        """
+id: gateway_target
+scope: user
+applies_to: [gateway]
+priority: 10
+enabled: true
+version: v1
+content: Return only JSON matching IntentDecision.
+tags: []
+metadata: {}
+""",
+        encoding="utf-8",
+    )
+
+    llm = FakeLLMClient(
+        json.dumps(
+            {
+                "mode": "conversational",
+                "requires_execution": False,
+                "confidence": 0.91,
+                "rationale": "Greeting only.",
+            }
+        )
+    )
+    decision = ConversationGateway(llm_client=llm, prompts_root=prompts_root).classify("hi")
+
+    assert decision.mode == "conversational"
+    assert decision.prompt_build is not None
+    assert "[GLOBAL SAFETY]" in llm.calls[0][0]
+    assert "[ROLE: PLANNER]" in llm.calls[0][0]
+    assert "[RISK CONTROL]" in llm.calls[0][0]
+    assert "[PROJECT CONTEXT]" in llm.calls[0][0]
+
+
+def test_gateway_fails_closed_when_prompt_build_fails(tmp_path: Path) -> None:
+    prompts_root = tmp_path / "prompts"
+    (prompts_root / "step").mkdir(parents=True)
+    (prompts_root / "step" / "planner.yaml").write_text(
+        """
+id: planner_role
+scope: step
+applies_to: [planning]
+priority: 50
+enabled: true
+version: v1
+content: Classify only. Do not execute.
+tags: []
+metadata: {}
+""",
+        encoding="utf-8",
+    )
+
+    decision = ConversationGateway(
+        llm_client=FakeLLMClient("{}"),
+        prompts_root=prompts_root,
+    ).classify("hi")
+
+    assert decision.mode == "clarify"
+    assert decision.requires_execution is False
+    assert decision.prompt_build is None

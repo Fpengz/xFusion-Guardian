@@ -4,7 +4,11 @@ from collections.abc import Iterable
 
 from xfusion.capabilities.schema import validate_schema_contract
 from xfusion.domain.enums import ApprovalMode, RiskTier
-from xfusion.domain.models.capability import CapabilityDefinition, RuntimeConstraints
+from xfusion.domain.models.capability import (
+    CapabilityDefinition,
+    CapabilityPrompt,
+    RuntimeConstraints,
+)
 
 
 class CapabilityRegistry:
@@ -112,6 +116,13 @@ def _capability(
         preview_builder="default",
         verification_recommendation=verification_recommendation,
         redaction_policy="standard",
+        prompt=CapabilityPrompt(
+            instructions=f"{verb.title()} {object_name} using only validated capability inputs.",
+            constraints=[
+                "Do not exceed the capability input schema.",
+                "Do not infer outputs that are not present in normalized results.",
+            ],
+        ),
     )
 
 

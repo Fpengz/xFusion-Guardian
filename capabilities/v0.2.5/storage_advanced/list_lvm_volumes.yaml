@@ -1,0 +1,54 @@
+api_version: xfusion.capability/v1
+name: storage_advanced.list_lvm_volumes
+version: 1
+short_description: List lvm volumes on the Ubuntu/systemd/Docker target platform.
+risk_tier: tier_0
+approval_mode: auto
+is_read_only: true
+side_effect_classification: none
+input_schema:
+  type: object
+  required: []
+  properties:
+    target:
+      type: string
+      minLength: 1
+      maxLength: 4096
+    options:
+      type: object
+  additionalProperties: false
+output_schema:
+  type: object
+  required: [status]
+  properties:
+    status:
+      type: string
+    summary:
+      type: string
+    unavailable_reason:
+      type: string
+  additionalProperties: false
+target_constraints:
+  target_kind: storage_advanced
+  paths:
+    forbidden: ["/", "/etc", "/boot", "/usr", "/var/lib"]
+execution:
+  type: python_adapter
+  adapter_id: catalog.storage_advanced.list_lvm_volumes
+  constraints:
+    timeout_ms: 30000
+    max_stdout_bytes: 100000
+    max_stderr_bytes: 100000
+    env_allowlist: []
+verification:
+  type: output_check
+  field: status
+  operator: exists
+redaction_policy: standard
+prompt:
+  instructions: |
+    List lvm volumes on the Ubuntu/systemd/Docker target platform.
+    Use only validated inputs and return structured, schema-aligned output.
+  constraints:
+    - Stay within the capability input schema and validated target scope.
+    - Do not invent side effects or outputs that are not present in normalized results.

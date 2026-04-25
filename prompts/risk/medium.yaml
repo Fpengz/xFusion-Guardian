@@ -1,0 +1,11 @@
+id: medium_risk
+scope: risk
+applies_to:
+  - medium
+priority: 50
+enabled: true
+version: v1
+content: |
+  Require explicit scope and preserve approval-aware language for bounded mutations.
+tags: []
+metadata: {}

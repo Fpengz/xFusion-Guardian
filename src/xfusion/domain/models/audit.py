@@ -31,3 +31,4 @@ class AuditRecord(BaseModel):
     resolution_record: dict[str, object] = Field(default_factory=dict)
     fallback_reason: str | None = None
     integrity_hashes: dict[str, object] = Field(default_factory=dict)
+    prompt_records: list[dict[str, object]] = Field(default_factory=list)

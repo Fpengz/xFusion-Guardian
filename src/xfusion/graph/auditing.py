@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import cast
 
 from xfusion.audit.jsonl_sink import JsonlAuditSink
 from xfusion.audit.logger import AuditLogger
@@ -74,6 +75,7 @@ def log_graph_event(
     repair_proposals, repair_redaction = _safe_redact(
         [proposal.model_dump(mode="json") for proposal in state.repair_proposals]
     )
+    prompt_records, prompt_redaction = _safe_redact(state.prompt_records)
     plan_draft, plan_redaction = _safe_redact(state.plan.model_dump(mode="json"))
     normalized_args, args_redaction = _safe_redact(step.normalized_args or step.args)
     summary_value, summary_redaction = _safe_redact(summary)
@@ -159,6 +161,7 @@ def log_graph_event(
         "after_state": after_state,
         "verification_result": redacted_verification,
         "repair_proposals": repair_proposals,
+        "prompt_records": prompt_records,
         "normalized_output": redacted_output,
         "non_execution_reason": step.failure_class if step.status != "success" else None,
         "non_execution": (
@@ -184,6 +187,7 @@ def log_graph_event(
             "summary": summary_redaction,
             "step": step.redaction_metadata,
             "repair_proposals": repair_redaction,
+            "prompt_records": prompt_redaction,
         },
         "status": status,
         "summary": summary_value,
@@ -226,4 +230,9 @@ def log_graph_event(
             resolution_record=step.resolution_record,
             fallback_reason=step.fallback_reason,
             integrity_hashes=integrity_hashes,
+            prompt_records=(
+                cast(list[dict[str, object]], prompt_records)
+                if isinstance(prompt_records, list)
+                else []
+            ),
         )

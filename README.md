@@ -99,6 +99,7 @@ Important trust boundary:
 - [docs/specs/xfusion-v0.2.md](docs/specs/xfusion-v0.2.md) - normative v0.2 spec
 - [docs/architecture/capability-schema.md](docs/architecture/capability-schema.md) - XFusion Capability Schema contract
 - [docs/architecture/execution-policy-v0.2.4.md](docs/architecture/execution-policy-v0.2.4.md) - v0.2.4 policy integrity and machine-readable decision-chain contract
+- [docs/architecture/v0.2.5-controlled-execution-platform.md](docs/architecture/v0.2.5-controlled-execution-platform.md) - v0.2.5 hybrid manifest capability engine
 - [docs/architecture/schema-subset.md](docs/architecture/schema-subset.md) - quick pointer to the schema subset contract
 - [docs/release-readiness-v0.2.md](docs/release-readiness-v0.2.md) - reviewer notes
 - [docs/release-plan-v0.2.4.md](docs/release-plan-v0.2.4.md) - v0.2.4 release notes and deferred backlog

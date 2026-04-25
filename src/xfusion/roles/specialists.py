@@ -284,7 +284,7 @@ class PlanningAgent(SpecialistAgent):
             pass  # Will use fallback
 
         # Resolve intent to capability
-        capability_name, extracted_args, clarification = resolve_intent_to_capability(
+        resolution = resolve_intent_to_capability(
             user_input=state.user_input,
             registry=self.registry,
             llm_client=self.llm_client,
@@ -292,9 +292,9 @@ class PlanningAgent(SpecialistAgent):
         )
 
         return {
-            "resolved_capability": capability_name,
-            "extracted_args": extracted_args,
-            "clarification_needed": clarification,
+            "resolved_capability": resolution.capability_name,
+            "extracted_args": resolution.arguments,
+            "clarification_needed": resolution.clarification_question,
             "user_input": state.user_input,
         }
 

@@ -25,6 +25,7 @@ class GatewayTurnResponse(BaseModel):
     clarification: ClarificationResponse | None = None
     plan: object | None = None
     audit_records: list[dict[str, object]] = Field(default_factory=list)
+    prompt_records: list[dict[str, object]] = Field(default_factory=list)
     execution_surface: str | None = None
 
 
@@ -90,6 +91,7 @@ def handle_user_turn(
             message=str(next_state.get("response", "")),
             plan=next_state.get("plan"),
             audit_records=list(next_state.get("audit_records", [])),
+            prompt_records=list(next_state.get("prompt_records", [])),
             execution_surface=_latest_execution_surface(next_state),
         ),
         requires_execution=True,
@@ -102,6 +104,9 @@ def non_operational_response(decision: IntentDecision) -> GatewayTurnResponse:
         return GatewayTurnResponse(
             mode="conversational",
             message="Hi. I can help with bounded Linux operations when you give me a clear task.",
+            prompt_records=(
+                [decision.prompt_build.model_dump(mode="json")] if decision.prompt_build else []
+            ),
         )
 
     clarification = decision.clarification or IntentDecision.fail_closed().clarification
@@ -110,6 +115,9 @@ def non_operational_response(decision: IntentDecision) -> GatewayTurnResponse:
         mode="clarify",
         message=_format_clarification_message(clarification),
         clarification=clarification,
+        prompt_records=(
+            [decision.prompt_build.model_dump(mode="json")] if decision.prompt_build else []
+        ),
     )
 
 
