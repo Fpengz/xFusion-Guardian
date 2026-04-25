@@ -1,0 +1,124 @@
+from __future__ import annotations
+
+from typing import Any
+
+from rich.text import Text
+from textual.widgets import Static
+
+from xfusion.domain.enums import StepStatus
+from xfusion.domain.models.execution_plan import PlanStep
+
+STATUS_STYLE = {
+    StepStatus.PENDING: "dim",
+    StepStatus.RUNNING: "yellow",
+    StepStatus.SUCCESS: "green",
+    StepStatus.FAILED: "red",
+    StepStatus.SKIPPED: "blue",
+    StepStatus.REFUSED: "red",
+}
+
+STATUS_SYMBOL = {
+    StepStatus.PENDING: "○",
+    StepStatus.RUNNING: "◆",
+    StepStatus.SUCCESS: "●",
+    StepStatus.FAILED: "×",
+    StepStatus.SKIPPED: "◇",
+    StepStatus.REFUSED: "!",
+}
+
+
+class StepWidget(Static):
+    """Render one execution step as a compact timeline row."""
+
+    def __init__(
+        self,
+        step: PlanStep,
+        output: dict[str, Any] | None = None,
+        *,
+        debug: bool = False,
+    ) -> None:
+        super().__init__()
+        self.step = step
+        self.output = output
+        self.debug = debug
+
+    def render(self) -> Text:
+        style = STATUS_STYLE.get(self.step.status, "")
+        symbol = STATUS_SYMBOL.get(self.step.status, "•")
+        risk = self._risk_label()
+        approval = self._approval_label()
+
+        result = Text()
+        result.append(symbol, style=style)
+        result.append(f" {self.step.status.value.upper()} ", style=f"bold {style}".strip())
+        result.append(self.step.capability, style="bold")
+        result.append(f"  risk={risk}", style="dim")
+        result.append(f"  approval={approval}", style="dim")
+
+        summary = str((self.output or {}).get("summary") or "").strip()
+        if summary:
+            result.append(f"\n  {summary}", style="dim")
+
+        stdout = str((self.output or {}).get("stdout") or "").strip()
+        if stdout and self.debug:
+            result.append("\n  output: ", style="bold")
+            result.append(stdout[:240], style="dim")
+
+        if self.debug:
+            self._append_debug_metadata(result)
+
+        return result
+
+    def _risk_label(self) -> str:
+        final_risk = self.step.final_risk_category or self.step.policy_category
+        return final_risk.value if final_risk else "unknown"
+
+    def _approval_label(self) -> str:
+        if self.step.approved_action_hash:
+            return "approved"
+        if self.step.approval_id:
+            return "requested"
+        return "not-required"
+
+    def _append_debug_metadata(self, result: Text) -> None:
+        envelope = self.step.system_risk_envelope
+        escalated = "yes" if envelope.get("escalated") else "no"
+        policy_category = (
+            self.step.policy_category.value if self.step.policy_category else "unknown"
+        )
+        final_risk = self._risk_label()
+        args_str = ", ".join(f"{key}={value}" for key, value in self.step.args.items())
+
+        result.append("\n  Surface: ", style="dim")
+        result.append(self.step.execution_surface.value, style="dim")
+        result.append("\n  Policy: ", style="dim")
+        result.append(policy_category, style="dim")
+        result.append("\n  Final risk: ", style="dim")
+        result.append(final_risk, style="dim")
+        result.append("\n  Escalated: ", style="dim")
+        result.append(escalated, style="dim")
+        result.append("\n  Approval: ", style="dim")
+        result.append(self._approval_label().replace("-", " "), style="dim")
+
+        if self.step.fallback_reason:
+            result.append("\n  Fallback: ", style="dim")
+            result.append(self.step.fallback_reason, style="dim")
+
+        fingerprint = self.step.resolution_record.get("raw_command_fingerprint")
+        if fingerprint:
+            result.append("\n  Fingerprint: ", style="dim")
+            result.append(str(fingerprint), style="dim")
+
+        result.append("\n  $ ", style="dim")
+        result.append(f"{self.step.capability} {args_str}", style="dim")
+
+        for entry in self.step.command_trace[-2:]:
+            argv = entry.get("ran_argv") or entry.get("planned_argv")
+            if isinstance(argv, list):
+                result.append("\n  argv: " + " ".join(str(part) for part in argv), style="dim")
+            stdout = str(entry.get("stdout_excerpt") or "").strip()
+            stderr = str(entry.get("stderr_excerpt") or "").strip()
+            if stdout:
+                result.append("\n  stdout: " + stdout[:240], style="dim")
+            if stderr:
+                result.append("\n  stderr: " + stderr[:240], style="dim red")
