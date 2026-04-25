@@ -55,10 +55,22 @@ class ApprovalModal(ModalScreen[str]):
             yield Label("Type exactly:")
             yield Label(f" {self.phrase} ", id="approval-phrase")
             yield Input(placeholder="Confirmation phrase", id="approval-input")
-            yield Label("[dim]Esc cancels[/]")
+            yield Label(
+                "[dim]Paste/type the phrase, then press Enter. Esc cancels.[/]",
+                id="approval-help",
+            )
+
+    def on_mount(self) -> None:
+        self.query_one("#approval-input", Input).focus()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        self.dismiss(event.value)
+        phrase = event.value.strip()
+        if not phrase:
+            self.query_one("#approval-help", Label).update(
+                "[dim]Paste/type the phrase above, then press Enter. Esc cancels.[/]"
+            )
+            return
+        self.dismiss(phrase)
 
     def on_key(self, event) -> None:
         if event.key == "escape":

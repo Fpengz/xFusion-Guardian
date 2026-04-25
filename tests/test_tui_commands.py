@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from textual.app import App, ComposeResult
+from textual.widgets import Input
 
 from xfusion.app.commands.core import ExitCommand, HelpCommand, ResetCommand
 from xfusion.app.commands.info import AuditCommand, ListCommand, TemplatesCommand
@@ -166,6 +167,11 @@ class PaletteHarness(App):
         yield CommandPalette(id="palette")
 
 
+class ApprovalModalHarness(App[None]):
+    def compose(self) -> ComposeResult:
+        yield Input(id="background-input")
+
+
 @pytest.mark.anyio
 async def test_command_palette_selection_returns_selected_command():
     help_cmd = HelpCommand()
@@ -193,6 +199,33 @@ def test_approval_modal_escape_dismisses_without_phrase():
     modal.on_key(event)
 
     dismiss.assert_called_once_with(None)
+
+
+def test_approval_modal_blank_submit_stays_open_and_shows_hint():
+    modal = ApprovalModal("APPROVE 123")
+    dismiss = MagicMock()
+    cast(Any, modal).dismiss = dismiss
+    help_text = MagicMock()
+    cast(Any, modal).query_one = MagicMock(return_value=help_text)
+    event = MagicMock()
+    event.value = "   "
+
+    modal.on_input_submitted(event)
+
+    dismiss.assert_not_called()
+    help_text.update.assert_called_once()
+
+
+@pytest.mark.anyio
+async def test_approval_modal_autofocuses_confirmation_input():
+    async with ApprovalModalHarness().run_test() as pilot:
+        await pilot.app.push_screen(ApprovalModal("APPROVE 123"))
+        await pilot.pause()
+
+        focused = pilot.app.focused
+
+        assert isinstance(focused, Input)
+        assert focused.id == "approval-input"
 
 
 def test_tui_startup_banner_is_compact_not_technical_block():
