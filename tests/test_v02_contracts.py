@@ -459,6 +459,35 @@ def test_approval_record_binds_phrase_and_fingerprint() -> None:
     assert registry.executed_tools == ["process.kill"]
 
 
+def test_confirmation_response_is_concise_and_uses_exact_phrase_instruction() -> None:
+    registry = MockRegistry()
+    graph = build_agent_graph(registry).compile()
+    plan = ExecutionPlan(
+        plan_id="concise-confirmation",
+        goal="stop process",
+        language="en",
+        target_context={"host": "local", "port": 8080},
+        steps=[
+            PlanStep(
+                step_id="kill",
+                capability="process.kill",
+                args={"pid": 1234, "signal": "TERM"},
+                expected_outputs={"ok": "boolean"},
+                justification="Stop bounded process.",
+                on_failure="stop",
+            )
+        ],
+        verification_strategy="verify tool success",
+    )
+
+    state = graph.invoke(make_graph_state(plan=plan))
+
+    assert state["plan"].interaction_state == InteractionState.AWAITING_CONFIRMATION
+    assert "Type exactly:" in state["response"]
+    assert "Preview:" not in state["response"]
+    assert "impacted target:" not in state["response"]
+
+
 def test_stale_approval_invalidates_after_target_change() -> None:
     registry = MockRegistry()
     graph = build_agent_graph(registry).compile()

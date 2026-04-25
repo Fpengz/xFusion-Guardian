@@ -43,6 +43,8 @@ def _format_normal_response(
     plan = state.plan
     if not plan:
         return state.response or "i No action executed."
+    if plan.interaction_state == InteractionState.AWAITING_CONFIRMATION:
+        return _format_confirmation_response(state, source_record=source_record)
 
     # 1. Status Header
     status_symbol = "➜"
@@ -98,6 +100,36 @@ def _format_normal_response(
         next_section += "\n".join(f"- {action}" for action in next_actions)
 
     return f"{header}\n{details}\n{result_section}\n{summary_section}{next_section}"
+
+
+def _format_confirmation_response(
+    state: AgentGraphState,
+    *,
+    source_record: dict[str, object] | None,
+) -> str:
+    about_to_run = _about_to_run_summary(state, source_record)
+    phrase = state.pending_confirmation_phrase
+    lines = [
+        "# ➜ Action Required",
+        "",
+        "## Pending approval",
+        f"- About to run: {about_to_run}",
+        "- Status: Waiting for confirmation before any mutating action runs.",
+        "",
+        "## Result:",
+        "Approval is required before this step can proceed.",
+        "",
+        "## What this means:",
+        "No changes have been made yet.",
+        "",
+        "## Next actions:",
+    ]
+    if phrase:
+        lines.append(f"- Type exactly: '{phrase}'")
+    else:
+        lines.append("- Provide the required confirmation phrase.")
+    lines.append("- Use the confirmation dialog and press Enter, or press Esc to cancel.")
+    return "\n".join(lines)
 
 
 def _is_tabular(text: str) -> bool:
