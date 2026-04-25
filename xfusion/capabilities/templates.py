@@ -10,6 +10,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from xfusion.policy.categories import PolicyCategory
 
+SHELL_METACHARACTER_PATTERN = re.compile(r"[*?\[\]{}$`;&|<>]")
+
 
 class TemplateParameter(BaseModel):
     """Parameter definition for a command template."""
@@ -104,6 +106,11 @@ class TemplateEngine:
                 errors.append(
                     f"Parameter '{param_name}' value '{value}' does not match "
                     f"pattern {param_def.validation}"
+                )
+            if isinstance(value, str) and SHELL_METACHARACTER_PATTERN.search(value):
+                errors.append(
+                    f"Parameter '{param_name}' contains shell metacharacter(s) "
+                    "that are not allowed in argv-only templates"
                 )
 
         if errors:

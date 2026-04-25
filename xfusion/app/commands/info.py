@@ -109,3 +109,92 @@ class CompactCommand(BaseCommand):
         app.add_agent_message(
             {"response": f"✦ Compacted {count} audit records into a session snapshot."}
         )
+
+
+class ListCommand(BaseCommand):
+    name = "list"
+    aliases = ["capabilities", "caps", "tools"]
+    description = "List all registered agent capabilities."
+    usage = "/list"
+    mutates_session_state = False
+
+    async def handle(self, app: XFusionTUI, args: list[str]) -> None:
+        from rich.table import Table
+
+        from xfusion.app.tui import Static
+        from xfusion.capabilities.registry import build_default_capability_registry
+
+        registry = build_default_capability_registry()
+        capabilities = registry.all()
+
+        table = Table(title="Registered Capabilities", box=None, show_header=True)
+        table.add_column("Capability", style="bold #10b981")
+        table.add_column("Action", style="#e2e8f0")
+        table.add_column("Risk", style="dim #94a3b8")
+        table.add_column("Approval", style="dim #94a3b8")
+
+        for cap in sorted(capabilities, key=lambda x: x.name):
+            table.add_row(
+                cap.name,
+                f"{cap.verb} {cap.object}",
+                cap.risk_tier.value.upper(),
+                cap.approval_mode.value.upper(),
+            )
+
+        app.query_one("#timeline").mount(Static(table))
+
+
+class TemplatesCommand(BaseCommand):
+    name = "templates"
+    description = "List structured command templates available before restricted shell fallback."
+    usage = "/templates"
+    mutates_session_state = False
+
+    async def handle(self, app: XFusionTUI, args: list[str]) -> None:
+        from rich.table import Table
+
+        from xfusion.app.tui import Static
+        from xfusion.capabilities.default_templates import build_default_templates
+
+        templates = [template for template in build_default_templates() if template.enabled]
+
+        table = Table(title="Structured Templates", box=None, show_header=True)
+        table.add_column("Template", style="bold #10b981")
+        table.add_column("Category", style="dim #94a3b8")
+        table.add_column("Approval", style="dim #94a3b8")
+        table.add_column("Description", style="#e2e8f0")
+
+        for template in sorted(templates, key=lambda item: item.name):
+            approval = "required" if template.confirm_required else "auto"
+            table.add_row(
+                template.name,
+                template.category.value,
+                approval,
+                template.description,
+            )
+
+        app.query_one("#timeline").mount(Static(table))
+
+
+class AuditCommand(BaseCommand):
+    name = "audit"
+    description = "Show the most recent audit trace records for this session."
+    usage = "/audit"
+    mutates_session_state = False
+
+    async def handle(self, app: XFusionTUI, args: list[str]) -> None:
+        records = cast(list, app.state.get("audit_records", []))
+        if not records:
+            app.add_agent_message({"response": "No audit records in the current session."})
+            return
+
+        audit_text = "### Recent Audit Records\n\n"
+        for index, record in enumerate(records[-10:], start=1):
+            rec = cast(dict, record)
+            status = rec.get("status", "unknown")
+            step_id = rec.get("step_id", "unknown")
+            surface = rec.get("execution_surface", "unknown")
+            category = rec.get("final_risk_category") or rec.get("policy_category") or "unknown"
+            audit_text += f"{index}. `{step_id}` `{status}` surface=`{surface}` risk=`{category}`\n"
+
+        app.add_agent_message({"response": audit_text})

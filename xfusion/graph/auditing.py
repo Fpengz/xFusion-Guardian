@@ -94,6 +94,15 @@ def log_graph_event(
         "step_id": step.step_id,
         "capability": step.capability,
         "normalized_args": step.normalized_args or step.args,
+        "execution_surface": step.execution_surface,
+        "policy_category": step.policy_category,
+        "final_risk_category": step.final_risk_category,
+    }
+    integrity_hashes: dict[str, object] = {
+        "intent_hash": step.intent_hash,
+        "planned_action_hash": step.planned_action_hash,
+        "approved_action_hash": step.approved_action_hash,
+        "executed_action_hash": step.executed_action_hash,
     }
 
     record = {
@@ -110,6 +119,17 @@ def log_graph_event(
         "normalized_step": normalized_step,
         "step_id": step.step_id,
         "capability": step.capability,
+        "execution_surface": step.execution_surface.value,
+        "policy_category": step.policy_category.value if step.policy_category else None,
+        "final_risk_category": (
+            step.final_risk_category.value if step.final_risk_category else None
+        ),
+        "impact_scope": step.impact_scope,
+        "agent_risk_assessment": step.agent_risk_assessment,
+        "system_risk_envelope": step.system_risk_envelope,
+        "resolution_record": step.resolution_record,
+        "fallback_reason": step.fallback_reason,
+        "integrity_hashes": integrity_hashes,
         "risk_classification": risk_contract,
         "policy_decision": policy_decision,
         "policy_decision_code": state.policy_decision.decision.value
@@ -195,4 +215,15 @@ def log_graph_event(
             step_ended_at=ended,
             status=status,
             summary=str(summary_value),
+            execution_surface=step.execution_surface.value,
+            policy_category=step.policy_category.value if step.policy_category else None,
+            final_risk_category=(
+                step.final_risk_category.value if step.final_risk_category else None
+            ),
+            impact_scope=step.impact_scope,
+            agent_risk_assessment=step.agent_risk_assessment,
+            system_risk_envelope=step.system_risk_envelope,
+            resolution_record=step.resolution_record,
+            fallback_reason=step.fallback_reason,
+            integrity_hashes=integrity_hashes,
         )

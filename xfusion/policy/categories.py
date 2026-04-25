@@ -3,17 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 
-
-class PolicyCategory(StrEnum):
-    """Five-tier policy categorization for command classification."""
-
-    READ_ONLY = "read_only"
-    WRITE_SAFE = "write_safe"
-    DESTRUCTIVE = "destructive"
-    PRIVILEGED = "privileged"
-    FORBIDDEN = "forbidden"
+from xfusion.domain.enums import PolicyCategory
 
 
 @dataclass(frozen=True)

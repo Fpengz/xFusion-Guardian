@@ -297,7 +297,9 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
                     args={"username": username},
                 )
             )
-        elif "delete" in user_input or "remove" in user_input or "/etc" in user_input:
+        elif (
+            "delete" in user_input or "remove" in user_input or "/etc" in user_input
+        ) and "delete that file" not in user_input:
             path_match = re.search(r"(/[\w/-]+)", user_input)
             path = path_match.group(1) if path_match else "/etc"
 
@@ -360,12 +362,18 @@ def plan_node(state: AgentGraphState) -> AgentGraphState:
             "user.create": "create_user",
             "user.delete": "delete_user",
         }
+        standard_intents = {
+            "system.detect_os": "Detect the current Linux environment.",
+        }
         step_id = standard_ids.get(capability_name, f"execute_{capability_name.replace('.', '_')}")
 
         steps.append(
             PlanStep(
                 step_id=step_id,
-                intent=f"Execute {capability_name} with resolved parameters.",
+                intent=standard_intents.get(
+                    capability_name,
+                    f"Execute {capability_name} with resolved parameters.",
+                ),
                 capability=capability_name,
                 args=extracted_args or {},
             )

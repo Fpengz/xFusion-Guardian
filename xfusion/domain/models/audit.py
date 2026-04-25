@@ -22,3 +22,12 @@ class AuditRecord(BaseModel):
     step_ended_at: datetime | None = None
     status: str = Field(min_length=1)
     summary: str = Field(min_length=1)
+    execution_surface: str | None = None
+    policy_category: str | None = None
+    final_risk_category: str | None = None
+    impact_scope: dict[str, object] = Field(default_factory=dict)
+    agent_risk_assessment: dict[str, object] = Field(default_factory=dict)
+    system_risk_envelope: dict[str, object] = Field(default_factory=dict)
+    resolution_record: dict[str, object] = Field(default_factory=dict)
+    fallback_reason: str | None = None
+    integrity_hashes: dict[str, object] = Field(default_factory=dict)

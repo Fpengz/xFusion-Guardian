@@ -32,9 +32,9 @@ class HelpCommand(BaseCommand):
         from xfusion.app.tui import Static
 
         table = Table(title="Available Commands", box=None, show_header=True)
-        table.add_column("Command", style="cyan")
-        table.add_column("Aliases", style="magenta")
-        table.add_column("Description", style="white")
+        table.add_column("Command", style="bold #10b981")
+        table.add_column("Aliases", style="dim #94a3b8")
+        table.add_column("Description", style="#e2e8f0")
 
         # We need access to the registry. I'll assume it's attached to the app.
         for cmd in sorted(app.command_registry.get_all(), key=lambda x: x.name):
@@ -47,11 +47,11 @@ class HelpCommand(BaseCommand):
         app.query_one("#timeline").mount(Static(table))
 
 
-class NewCommand(BaseCommand):
-    name = "new"
-    aliases = ["reset"]
+class ResetCommand(BaseCommand):
+    name = "reset"
+    aliases = ["new", "new-session"]
     description = "Start a new conversation/session while keeping the TUI process alive."
-    usage = "/new"
+    usage = "/reset"
     mutates_session_state = True
 
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:

@@ -25,9 +25,9 @@ class SessionsCommand(BaseCommand):
             return
 
         table = Table(title="Saved Sessions", box=None, show_header=True)
-        table.add_column("Session ID", style="cyan")
-        table.add_column("Updated At", style="magenta")
-        table.add_column("Last Input", style="white")
+        table.add_column("Session ID", style="bold #10b981")
+        table.add_column("Updated At", style="dim #94a3b8")
+        table.add_column("Last Input", style="#e2e8f0")
 
         for s in sessions:
             table.add_row(s["id"], s["updated_at"], s["last_input"])

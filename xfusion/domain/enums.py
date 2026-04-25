@@ -37,6 +37,20 @@ class RiskTier(StrEnum):
     TIER_3 = "tier_3"
 
 
+class PolicyCategory(StrEnum):
+    READ_ONLY = "read_only"
+    WRITE_SAFE = "write_safe"
+    DESTRUCTIVE = "destructive"
+    PRIVILEGED = "privileged"
+    FORBIDDEN = "forbidden"
+
+
+class ExecutionSurface(StrEnum):
+    CAPABILITY = "capability"
+    TEMPLATE = "template"
+    RESTRICTED_SHELL = "restricted_shell"
+
+
 class ApprovalMode(StrEnum):
     AUTO = "auto"
     HUMAN = "human"

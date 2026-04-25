@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from xfusion.domain.enums import ApprovalMode, InteractionState, RiskLevel, RiskTier, StepStatus
+from xfusion.domain.enums import (
+    ApprovalMode,
+    ExecutionSurface,
+    InteractionState,
+    PolicyCategory,
+    RiskLevel,
+    RiskTier,
+    StepStatus,
+)
 
 
 class PlanStep(BaseModel):
@@ -19,12 +27,24 @@ class PlanStep(BaseModel):
     justification: str = ""
     risk_hint: RiskTier | None = None
     approval_required_hint: ApprovalMode | None = None
+    execution_surface: ExecutionSurface = ExecutionSurface.CAPABILITY
+    policy_category: PolicyCategory | None = None
+    impact_scope: dict[str, object] = Field(default_factory=dict)
+    agent_risk_assessment: dict[str, object] = Field(default_factory=dict)
+    system_risk_envelope: dict[str, object] = Field(default_factory=dict)
+    final_risk_category: PolicyCategory | None = None
+    resolution_record: dict[str, object] = Field(default_factory=dict)
+    fallback_reason: str | None = None
     preview_summary: str = ""
     on_failure: str = ""
     verification_step_ids: list[str] = Field(default_factory=list)
     risk_level: RiskLevel = RiskLevel.LOW
     approval_id: str | None = None
     action_fingerprint: str | None = None
+    intent_hash: str | None = None
+    planned_action_hash: str | None = None
+    approved_action_hash: str | None = None
+    executed_action_hash: str | None = None
     normalized_args: dict[str, object] = Field(default_factory=dict)
     argument_provenance: dict[str, str] = Field(default_factory=dict)
     resolved_references: dict[str, object] = Field(default_factory=dict)

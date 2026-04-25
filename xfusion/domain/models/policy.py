@@ -4,7 +4,14 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from xfusion.domain.enums import ApprovalMode, PolicyDecisionValue, RiskLevel, RiskTier
+from xfusion.domain.enums import (
+    ApprovalMode,
+    ExecutionSurface,
+    PolicyCategory,
+    PolicyDecisionValue,
+    RiskLevel,
+    RiskTier,
+)
 
 
 class StepRiskContract(BaseModel):
@@ -30,6 +37,8 @@ class PolicyDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     decision: PolicyDecisionValue
+    execution_surface: ExecutionSurface = ExecutionSurface.CAPABILITY
+    policy_category: PolicyCategory | None = None
     matched_rule_id: str = Field(min_length=1)
     risk_tier: RiskTier
     approval_mode: ApprovalMode

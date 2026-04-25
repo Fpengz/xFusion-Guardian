@@ -9,8 +9,10 @@ from xfusion.policy.approval import (
     build_argument_provenance,
     build_referenced_output_fingerprints,
     build_step_binding,
+    stable_hash,
     validate_approval_for_invocation,
 )
+from xfusion.policy.envelope import build_action_integrity_hash, validate_execution_integrity
 from xfusion.policy.rules import (
     build_policy_snapshot_hash,
     build_policy_snapshot_payload,
@@ -142,11 +144,18 @@ def execute_node(state: AgentGraphState, registry=None) -> AgentGraphState:
     step.policy_snapshot_hash = live_policy_snapshot_hash
     step.policy_rule_id = policy_recheck.matched_rule_id
     step.approval_mode = policy_recheck.approval_mode
+    step.policy_category = policy_recheck.policy_category
+    step.final_risk_category = policy_recheck.policy_category
     step.risk_level = policy_recheck.risk_level
     step.risk_contract = (
         policy_recheck.risk_contract.model_dump() if policy_recheck.risk_contract else {}
     )
     step.requires_confirmation = policy_recheck.requires_approval
+    step.intent_hash = stable_hash(
+        {"goal": state.plan.goal, "intent_class": state.plan.intent_class}
+    )
+    step.planned_action_hash = build_action_integrity_hash(step, resolved_args=resolved_params)
+    step.executed_action_hash = step.planned_action_hash
 
     if policy_recheck.decision == PolicyDecisionValue.DENY:
         state.plan.interaction_state = InteractionState.REFUSED
@@ -232,6 +241,25 @@ def execute_node(state: AgentGraphState, registry=None) -> AgentGraphState:
                     "approval_id": approval.approval_id,
                     "capability": step.capability,
                     "normalized_args": resolved_params,
+                },
+            )
+        step.approved_action_hash = step.approved_action_hash or step.planned_action_hash
+        integrity_valid, integrity_reason = validate_execution_integrity(step)
+        if not integrity_valid:
+            return _fail_non_execution(
+                state,
+                step=step,
+                status=StepStatus.FAILED,
+                failure_class="approval_invalidated",
+                code=integrity_reason or "execution_integrity_mismatch",
+                reason_text=(
+                    "Execution blocked: approved action does not match executable action."
+                ),
+                details={
+                    "approval_id": approval.approval_id,
+                    "capability": step.capability,
+                    "approved_action_hash": step.approved_action_hash,
+                    "executed_action_hash": step.executed_action_hash,
                 },
             )
     elif step.requires_confirmation:

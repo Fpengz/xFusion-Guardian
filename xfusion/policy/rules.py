@@ -3,7 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 from xfusion.capabilities.registry import build_default_capability_registry
-from xfusion.domain.enums import ApprovalMode, PolicyDecisionValue, RiskTier
+from xfusion.domain.enums import (
+    ApprovalMode,
+    ExecutionSurface,
+    PolicyCategory,
+    PolicyDecisionValue,
+    RiskTier,
+)
 from xfusion.domain.models.capability import CapabilityDefinition
 from xfusion.domain.models.environment import EnvironmentState
 from xfusion.domain.models.policy import PolicyDecision, StepRiskContract
@@ -35,6 +41,8 @@ def _decision(
     reason: str,
     deny_code: str | None,
     reason_codes: list[str],
+    execution_surface: ExecutionSurface = ExecutionSurface.CAPABILITY,
+    policy_category: PolicyCategory | None = None,
     risk_contract: StepRiskContract | dict[str, object] | None = None,
     constraints_applied: list[str] | None = None,
     extra_explainability: dict[str, Any] | None = None,
@@ -49,6 +57,9 @@ def _decision(
     )
     return PolicyDecision(
         decision=decision,
+        execution_surface=execution_surface,
+        policy_category=policy_category
+        or _category_from_risk_contract(risk_contract_payload, approval_mode),
         matched_rule_id=matched_rule_id,
         risk_tier=risk_tier,
         approval_mode=approval_mode,
@@ -71,6 +82,25 @@ def _decision(
         reason=reason,
         risk_contract=risk_contract_payload,
     )
+
+
+def _category_from_risk_contract(
+    risk_contract: StepRiskContract | None,
+    approval_mode: ApprovalMode,
+) -> PolicyCategory:
+    if approval_mode == ApprovalMode.DENY:
+        return PolicyCategory.FORBIDDEN
+    if approval_mode == ApprovalMode.ADMIN:
+        return PolicyCategory.PRIVILEGED
+    if risk_contract is None:
+        return PolicyCategory.WRITE_SAFE
+    if risk_contract.risk_level == "low":
+        return PolicyCategory.READ_ONLY
+    if risk_contract.risk_level == "medium":
+        return PolicyCategory.WRITE_SAFE
+    if risk_contract.risk_level == "high":
+        return PolicyCategory.DESTRUCTIVE
+    return PolicyCategory.FORBIDDEN
 
 
 def _target_paths(args: dict[str, object]) -> list[str]:
@@ -101,6 +131,8 @@ def build_policy_snapshot_payload(
         "normalized_args": normalized_args,
         "argument_provenance": argument_provenance,
         "decision": decision.decision.value,
+        "execution_surface": decision.execution_surface.value,
+        "policy_category": decision.policy_category.value if decision.policy_category else None,
         "matched_rule_id": decision.matched_rule_id,
         "risk_tier": decision.risk_tier.value,
         "approval_mode": decision.approval_mode.value,

@@ -40,25 +40,121 @@ def _format_normal_response(
     *,
     source_record: dict[str, object] | None,
 ) -> str:
-    result = _result_summary(state, source_record)
+    plan = state.plan
+    if not plan:
+        return state.response or "i No action executed."
+
+    # 1. Status Header
+    status_symbol = "➜"
+    status_text = "Action Required"
+    if plan.interaction_state == InteractionState.COMPLETED:
+        status_symbol = "✔"
+        status_text = "Task Completed Successfully"
+    elif plan.interaction_state == InteractionState.FAILED:
+        status_symbol = "✖"
+        status_text = "Execution Failed"
+    elif plan.interaction_state == InteractionState.REFUSED:
+        status_symbol = "i"
+        status_text = "Action Blocked by Policy"
+
+    header = f"# {status_symbol} {status_text}\n"
+
+    # 2. Process Details
+    details = "## Process Details\n"
     about_to_run = _about_to_run_summary(state, source_record)
     ran = _ran_summary(state, source_record)
     output = _output_summary(state, source_record)
-    meaning = _meaning_summary(state, source_record, fallback=result)
+    result = (
+        _result_summary(state, source_record)
+        if plan.interaction_state
+        in {
+            InteractionState.AWAITING_CONFIRMATION,
+            InteractionState.AWAITING_DISAMBIGUATION,
+            InteractionState.REFUSED,
+            InteractionState.FAILED,
+        }
+        else output
+    )
+    details += f"- About to run: {about_to_run}\n"
+    details += f"- Ran: {ran}\n"
+    details += f"- Output: {output}\n"
+
+    # 3. Result / Table
+    result_section = "## Result:\n"
+    if _is_tabular(result):
+        result_section += _format_as_markdown_table(result)
+    else:
+        result_section += f"{result}\n"
+
+    # 4. Summary & Next Steps
+    meaning = _meaning_summary(state, source_record, fallback=_result_summary(state, source_record))
     verification = _verification_summary(state, source_record)
-    lines = [
-        f"Result: {result}",
-        f"About to run: {about_to_run}",
-        f"Ran: {ran}",
-        f"Output: {output}",
-        f"What this means: {meaning}",
-        f"Verification: {verification}",
-    ]
+    summary_section = f"## What this means:\n{meaning}\n\n## Verification:\n{verification}\n\n"
+
     next_actions = _next_actions(state)
+    next_section = ""
     if next_actions:
-        lines.append("Next actions:")
-        lines.extend(f"{i}. {action}" for i, action in enumerate(next_actions, start=1))
-    return "\n".join(lines)
+        next_section = "## Next actions:\n"
+        next_section += "\n".join(f"- {action}" for action in next_actions)
+
+    return f"{header}\n{details}\n{result_section}\n{summary_section}{next_section}"
+
+
+def _is_tabular(text: str) -> bool:
+    """Heuristic to check if text contains tabular data."""
+    lines = text.strip().splitlines()
+    if len(lines) < 2:
+        return False
+    # Check if multiple lines have similar column-like spacing or common headers
+    # Common CLI headers: Filesystem, PID, USER, %CPU, etc.
+    headers = {
+        "filesystem",
+        "size",
+        "used",
+        "avail",
+        "use%",
+        "pid",
+        "user",
+        "%cpu",
+        "%mem",
+        "vsz",
+        "rss",
+        "tty",
+        "stat",
+        "start",
+        "time",
+        "command",
+    }
+    first_line_words = set(lines[0].lower().split())
+    return any(h in first_line_words for h in headers)
+
+
+def _format_as_markdown_table(text: str) -> str:
+    """Attempt to format fixed-width CLI output as a Markdown table."""
+    lines = text.strip().splitlines()
+    if not lines:
+        return text
+
+    # Simple fixed-width to markdown conversion
+    import re
+
+    table_lines = []
+    for i, line in enumerate(lines):
+        # Split by 2 or more spaces
+        parts = re.split(r"\s{2,}", line.strip())
+        if len(parts) < 2:
+            # Fallback for lines that don't split well
+            parts = line.strip().split()
+
+        table_line = "| " + " | ".join(parts) + " |"
+        table_lines.append(table_line)
+
+        if i == 0:
+            # Add separator
+            separator = "| " + " | ".join(["---"] * len(parts)) + " |"
+            table_lines.append(separator)
+
+    return "\n".join(table_lines) + "\n"
 
 
 def _format_debug_response(
@@ -280,11 +376,22 @@ def _ran_summary(state: AgentGraphState, source_record: dict[str, object] | None
 
 
 def _output_summary(state: AgentGraphState, source_record: dict[str, object] | None) -> str:
+    if source_record:
+        # Prefer raw stdout from normalized_output if it exists
+        normalized = source_record.get("normalized_output")
+        if isinstance(normalized, dict):
+            normalized_output = cast(dict[str, object], normalized)
+            stdout = normalized_output.get("stdout")
+            if isinstance(stdout, str) and stdout.strip():
+                return stdout.strip()
+
     trace_output = _format_trace_output_snippet(source_record)
     if trace_output != "No output snippet recorded.":
         return trace_output
+
     if source_record and source_record.get("normalized_output"):
         return _clip_text(str(source_record.get("normalized_output")), limit=240)
+
     action = _action_summary(source_record, fallback=state.response)
     first = _first_nonempty_line(action)
     if first:

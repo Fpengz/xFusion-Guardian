@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import uuid
 from typing import Any, cast
 
@@ -8,7 +9,7 @@ from rich.text import Text
 from textual import events, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.screen import ModalScreen
 from textual.widgets import Footer, Input, Label, RichLog, Static
@@ -19,14 +20,17 @@ from xfusion.app.commands.core import (
     DebugCommand,
     ExitCommand,
     HelpCommand,
-    NewCommand,
+    ResetCommand,
 )
 from xfusion.app.commands.info import (
+    AuditCommand,
     CompactCommand,
     ConfigCommand,
+    ListCommand,
     ModelCommand,
     PermissionsCommand,
     StatusCommand,
+    TemplatesCommand,
 )
 from xfusion.app.commands.registry import CommandRegistry
 from xfusion.app.commands.session import HistoryCommand, ResumeCommand, SessionsCommand
@@ -61,38 +65,78 @@ class StepWidget(Static):
         self.output = output
 
     def render(self) -> Text:
-        status_icons = {
-            StepStatus.PENDING: "○",
-            StepStatus.RUNNING: "●",
-            StepStatus.SUCCESS: "✔",
-            StepStatus.FAILED: "✘",
-            StepStatus.SKIPPED: "»",
-            StepStatus.REFUSED: "!",
-        }
-        icon = status_icons.get(self.step.status, "?")
-
         status_colors = {
-            StepStatus.PENDING: "gray",
-            StepStatus.RUNNING: "yellow",
-            StepStatus.SUCCESS: "green",
-            StepStatus.FAILED: "red",
-            StepStatus.SKIPPED: "blue",
-            StepStatus.REFUSED: "red",
+            StepStatus.PENDING: "#64748b",
+            StepStatus.RUNNING: "#f59e0b",
+            StepStatus.SUCCESS: "#10b981",
+            StepStatus.FAILED: "#ef4444",
+            StepStatus.SKIPPED: "#3b82f6",
+            StepStatus.REFUSED: "#ef4444",
         }
         color = status_colors.get(self.step.status, "white")
+        symbol = "➜" if self.step.status == StepStatus.RUNNING else "•"
 
         res = Text()
-        res.append(f"  {icon} ", style=f"bold {color}")
-        res.append(f"{self.step.intent or self.step.capability}", style="bold white")
-
-        if self.step.status == StepStatus.RUNNING or self.step.status == StepStatus.FAILED:
+        if self.step.status in {StepStatus.RUNNING, StepStatus.FAILED, StepStatus.SUCCESS}:
             args_str = ", ".join(f"{k}={v}" for k, v in self.step.args.items())
-            res.append(f"\n    $ {self.step.capability} {args_str}", style="dim")
+            envelope = self.step.system_risk_envelope
+            escalated = "yes" if envelope.get("escalated") else "no"
+            policy_category = (
+                self.step.policy_category.value if self.step.policy_category else "unknown"
+            )
+            final_risk = (
+                self.step.final_risk_category.value
+                if self.step.final_risk_category
+                else policy_category
+            )
+            approval_state = (
+                "approved"
+                if self.step.approved_action_hash
+                else ("requested" if self.step.approval_id else "not required")
+            )
+            fallback = (
+                f"\n  [dim]Fallback: {self.step.fallback_reason}[/]"
+                if self.step.fallback_reason
+                else ""
+            )
+            fingerprint = self.step.resolution_record.get("raw_command_fingerprint")
+            fingerprint_line = f"\n  [dim]Fingerprint: {fingerprint}[/]" if fingerprint else ""
+            cmd_line = (
+                f"\n[bold white] {symbol} Execution[/]\n"
+                f"  [dim]Surface: {self.step.execution_surface.value}[/]\n"
+                f"  [dim]Policy: {policy_category}[/]\n"
+                f"  [dim]Final risk: {final_risk}[/]\n"
+                f"  [dim]Escalated: {escalated}[/]\n"
+                f"  [dim]Approval: {approval_state}[/]"
+                f"{fallback}"
+                f"{fingerprint_line}\n"
+                f"  [dim]$ {self.step.capability} {args_str}[/]"
+            )
+            res.append(Text.from_markup(cmd_line))
+
+            for entry in self.step.command_trace[-2:]:
+                argv = entry.get("ran_argv") or entry.get("planned_argv")
+                if isinstance(argv, list):
+                    res.append("\n  argv: " + " ".join(str(part) for part in argv), style="dim")
+                stdout = str(entry.get("stdout_excerpt") or "").strip()
+                stderr = str(entry.get("stderr_excerpt") or "").strip()
+                if stdout:
+                    res.append("\n  stdout: " + stdout[:240], style="dim")
+                if stderr:
+                    res.append("\n  stderr: " + stderr[:240], style="dim red")
 
         if self.output:
+            # Show summary first
             summary = self.output.get("summary", "")
             if summary:
-                res.append(f"\n    └ {summary}", style="dim green")
+                res.append(Text.from_markup("\n[bold white]  └ Summary[/]\n"))
+                res.append(f"    {summary}", style=f"dim {color}")
+
+            # Show raw stdout if available
+            stdout = self.output.get("stdout")
+            if stdout:
+                res.append(Text.from_markup("\n[bold white]  └ Output[/]\n"))
+                res.append(f"    {stdout.strip()}", style="dim")
 
         return res
 
@@ -103,19 +147,21 @@ class AgentMessage(Static):
     def __init__(self, state: dict[str, Any]):
         super().__init__()
         self.state = state
-        self.header = Label("[bold #a78bfa]✦ Guardian[/]", id="agent-header")
-        self.thinking_label = Label("[italic #6b7280]Thinking...[/]", id="thinking")
+        self.plan_label = Label("", id="plan-info")
         self.steps_container = Vertical(id="steps")
         self.policy_label = Static("", id="policy-info")
-        self.explanation_label = Static("", id="explanation")
+        self.explanation_container = Vertical(
+            Label("[bold cyan][Interpretation][/]", id="interpretation-header"),
+            Static("", id="explanation"),
+            id="explanation-block",
+        )
         self.debug_container = Vertical(id="debug-info")
 
     def compose(self) -> ComposeResult:
-        yield self.header
-        yield self.thinking_label
+        yield self.plan_label
         yield self.steps_container
         yield self.policy_label
-        yield self.explanation_label
+        yield self.explanation_container
         yield self.debug_container
 
     def update_state(self, state: dict[str, Any]):
@@ -123,12 +169,11 @@ class AgentMessage(Static):
         plan = state.get("plan")
         mode = state.get("response_mode", "normal")
 
-        if state.get("response"):
-            self.thinking_label.display = False
+        if isinstance(plan, ExecutionPlan):
+            self.plan_label.update(f"[bold cyan] ➜ Plan[/]\n  • {plan.goal}")
+            self.plan_label.display = True
         else:
-            self.thinking_label.display = True
-            if plan:
-                self.thinking_label.update(f"[italic #6b7280]{plan.goal}...[/]")
+            self.plan_label.display = False
 
         self.steps_container.remove_children()
         if isinstance(plan, ExecutionPlan):
@@ -137,8 +182,13 @@ class AgentMessage(Static):
                 output = step_outputs.get(step.step_id)
                 self.steps_container.mount(StepWidget(step, output))
 
+        explanation_label = self.explanation_container.query_one("#explanation", Static)
+        header_label = self.explanation_container.query_one("#interpretation-header", Label)
         if state.get("response"):
-            self.explanation_label.update(Markdown(state["response"]))
+            self.explanation_container.display = True
+            symbol = "✔" if plan and plan.interaction_state == InteractionState.COMPLETED else "i"
+            header_label.update(f"[bold cyan] {symbol} Summary[/]")
+            explanation_label.update(Markdown(state["response"]))
 
         # Debug/Policy Info
         decision = state.get("policy_decision")
@@ -170,8 +220,7 @@ class ApprovalModal(ModalScreen[str]):
     #modal-content {
         width: 60;
         height: auto;
-        border: thick #ef4444;
-        background: #0c0c0c;
+        background: #000000;
         padding: 1 2;
     }
     #modal-content Label {
@@ -181,7 +230,8 @@ class ApprovalModal(ModalScreen[str]):
     }
     #approval-input {
         margin-top: 1;
-        border: solid #ef4444;
+        border: none;
+        background: #1e293b;
     }
     """
 
@@ -215,12 +265,10 @@ class CommandItem(Static):
 
     def render(self) -> Text:
         res = Text()
-        res.append(f"/{self.command.name}", style="bold cyan")
+        res.append(f"/{self.command.name}", style="bold")
         if self.command.aliases:
-            res.append(
-                f" ({', '.join(f'/{a}' for a in self.command.aliases)})", style="dim magenta"
-            )
-        res.append(f" - {self.command.description}", style="italic white")
+            res.append(f" ({', '.join(f'/{a}' for a in self.command.aliases)})", style="dim")
+        res.append(f" - {self.command.description}", style="italic")
         return res
 
 
@@ -230,25 +278,25 @@ class CommandPalette(VerticalScroll):
     DEFAULT_CSS = """
     CommandPalette {
         display: none;
-        background: #0f172a;
-        border: solid #1e293b;
+        background: #000000;
         height: auto;
         max-height: 10;
         width: 80;
         dock: bottom;
-        margin-bottom: 3;
-        margin-left: 1;
+        margin-bottom: 2;
+        margin-left: 2;
         padding: 0 1;
     }
     CommandPalette CommandItem {
         padding: 0 1;
+        color: #94a3b8;
     }
     CommandPalette CommandItem:hover {
         background: #1e293b;
     }
     CommandPalette .selected {
-        background: #3b82f6;
-        color: white;
+        background: #10b981;
+        color: #000000;
     }
     """
 
@@ -291,22 +339,18 @@ class XFusionTUI(App):
 
     CSS = """
     Screen {
-        background: #0c0c0c;
-        color: #e5e7eb;
-    }
-    #main-view {
-        width: 1fr;
-        height: 1fr;
+        background: transparent;
+        color: #e2e8f0;
     }
     #timeline {
         height: 1fr;
-        padding: 1 2;
+        padding: 0 2;
         overflow-y: scroll;
     }
     #sidebar {
         width: 40;
-        border-left: solid #1e293b;
-        background: #0f172a;
+        border-left: solid #334155;
+        background: transparent;
         display: none;
         padding: 1;
     }
@@ -315,12 +359,16 @@ class XFusionTUI(App):
         color: #f8fafc;
         text-style: bold;
     }
+    .shell-block {
+        margin: 1 0;
+        padding: 0;
+    }
     AgentMessage {
         margin: 1 0;
+        padding: 0;
     }
     #policy-info {
         color: #facc15;
-        margin-top: 1;
     }
     #debug-info {
         margin-top: 1;
@@ -332,46 +380,80 @@ class XFusionTUI(App):
     }
     #agent-header {
         margin-bottom: 0;
+        color: #10b981;
     }
     #steps {
         margin: 1 0;
         height: auto;
     }
-    #explanation {
+    #explanation-block {
         margin-top: 1;
+    }
+    #interpretation-header {
+        margin-bottom: 0;
+    }
+    Markdown {
+        padding: 0;
+    }
+    Markdown H1 {
+        color: #10b981;
+        text-style: bold;
+    }
+    Markdown H2 {
+        color: #3b82f6;
+        text-style: bold underline;
+    }
+    Markdown Bullet {
+        color: #facc15;
     }
     #input-container {
         dock: bottom;
         height: 3;
         padding: 0 1;
-        border-top: solid #1e293b;
+        background: #020617;
+        border-top: solid #334155;
+    }
+    #prompt-line {
+        height: 1;
+        width: 100%;
+        margin-top: 1;
+    }
+    #prompt-label {
+        color: #10b981;
+        text-style: bold;
+        margin-right: 1;
     }
     #main-input {
         border: none;
-        background: transparent;
+        background: #1e293b;
+        width: 1fr;
+        height: 1;
+        padding: 0 1;
     }
     #main-input:focus {
         border: none;
+        background: #334155;
     }
     #status-bar {
         dock: top;
         height: 1;
-        background: #1e293b;
+        background: transparent;
         color: #94a3b8;
         padding: 0 1;
-        text-style: italic;
+        text-style: bold dim;
     }
     """
 
     def compose(self) -> ComposeResult:
         yield Static("Initializing...", id="status-bar")
-        with Container(id="main-view"):
-            yield VerticalScroll(id="timeline")
-            yield CommandPalette(id="command-palette")
-            with Container(id="input-container"):
-                yield Input(
-                    placeholder="Ask XFusion Guardian (type / for commands)...", id="main-input"
-                )
+        yield VerticalScroll(id="timeline")
+        yield CommandPalette(id="command-palette")
+        with Horizontal(id="input-container"):
+            yield Label("guardian @xfusion >", id="prompt-label")
+            yield Input(
+                placeholder="Type / for commands or describe an operation...",
+                id="main-input",
+            )
         with Vertical(id="sidebar"):
             yield Static("[bold underline]ENVIRONMENT[/]")
             yield Static("", id="side-env")
@@ -380,8 +462,10 @@ class XFusionTUI(App):
         yield Footer()
 
     def on_key(self, event: events.Key) -> None:
-        """Handle global keys for palette navigation."""
+        """Handle global keys for palette navigation and history."""
         palette = self.query_one("#command-palette", CommandPalette)
+        main_input = self.query_one("#main-input", Input)
+
         if palette.display:
             if event.key == "up":
                 palette.move_selection(-1)
@@ -392,20 +476,39 @@ class XFusionTUI(App):
             elif event.key == "tab":
                 selected = palette.get_selected()
                 if selected:
-                    main_input = self.query_one("#main-input", Input)
                     main_input.value = f"/{selected.name} "
                     main_input.focus()
                 event.prevent_default()
             elif event.key == "escape":
                 palette.display = False
-                self.query_one("#main-input", Input).focus()
+                main_input.focus()
+                event.prevent_default()
+        elif main_input.has_focus:
+            if event.key == "up":
+                if self.input_history:
+                    if self.history_index == -1:
+                        self.history_index = len(self.input_history) - 1
+                    elif self.history_index > 0:
+                        self.history_index -= 1
+                    main_input.value = self.input_history[self.history_index]
+                    main_input.cursor_position = len(main_input.value)
+                event.prevent_default()
+            elif event.key == "down":
+                if self.input_history and self.history_index != -1:
+                    if self.history_index < len(self.input_history) - 1:
+                        self.history_index += 1
+                        main_input.value = self.input_history[self.history_index]
+                    else:
+                        self.history_index = -1
+                        main_input.value = ""
+                    main_input.cursor_position = len(main_input.value)
                 event.prevent_default()
 
     def on_mount(self) -> None:
         self.command_registry = CommandRegistry()
         self.command_registry.register(ExitCommand())
         self.command_registry.register(HelpCommand())
-        self.command_registry.register(NewCommand())
+        self.command_registry.register(ResetCommand())
         self.command_registry.register(DebugCommand())
         self.command_registry.register(ClearCommand())
         self.command_registry.register(SessionsCommand())
@@ -416,6 +519,9 @@ class XFusionTUI(App):
         self.command_registry.register(ConfigCommand())
         self.command_registry.register(ModelCommand())
         self.command_registry.register(CompactCommand())
+        self.command_registry.register(ListCommand())
+        self.command_registry.register(TemplatesCommand())
+        self.command_registry.register(AuditCommand())
 
         self.session_manager = SessionManager()
         self.runner = CommandRunner()
@@ -426,16 +532,33 @@ class XFusionTUI(App):
         self.graph = build_agent_graph(self.registry).compile()
 
         self.init_state()
+        self.input_history: list[str] = []
+        self.history_index = -1
 
-        # Initial greeting
-        self.add_agent_message(
-            {
-                "response": (
-                    "✦ Hello! I am XFusion Guardian. "
-                    "How can I assist you with your Linux environment today?"
-                )
-            }
-        )
+        # Technical banner
+        response_mode = str(self.state["response_mode"])
+        banner = f"""[cyan]────────────────────────────────
+XFusion Guardian v0.2.4.2
+Connected to: local runtime
+Working dir: {os.getcwd()}
+Mode: {response_mode.upper()} (approval required)
+Type /help for commands
+────────────────────────────────[/cyan]"""
+        self.query_one("#timeline").mount(Static(banner))
+        self.update_prompt()
+
+    def update_prompt(self) -> None:
+        """Update the prompt label with current directory and git info."""
+        cwd = os.getcwd().replace(os.path.expanduser("~"), "~")
+        try:
+            # Short attempt to get git branch
+            res = self.runner.run(["git", "branch", "--show-current"])
+            branch = res.stdout.strip() if res.exit_code == 0 else ""
+            branch_str = f" ({branch})" if branch else ""
+        except Exception:
+            branch_str = ""
+
+        self.query_one("#prompt-label", Label).update(f"guardian @xfusion {cwd}{branch_str} >")
 
     def init_state(self) -> None:
         """Initialize or reset the agent state."""
@@ -467,8 +590,9 @@ class XFusionTUI(App):
         env = cast(EnvironmentState, self.state["environment"])
         mode = cast(str, self.state["response_mode"])
         text = (
-            f"ID: {self.session_id} | {env.distro_family} {env.distro_version} | "
-            f"User: {env.current_user} | Mode: {mode.upper()}"
+            f"[ XFUSION GUARDIAN ]  session: {self.session_id}  |  "
+            f"mode: {mode.upper()}  |  debug: {'ON' if mode == 'debug' else 'OFF'}  |  "
+            f"model: {load_settings().llm_model or 'local'}"
         )
         self.query_one("#status-bar", Static).update(text)
 
@@ -482,7 +606,7 @@ class XFusionTUI(App):
 
     def add_user_message(self, text: str) -> None:
         self.query_one("#timeline", VerticalScroll).mount(
-            Static(f"[bold cyan]> {text}[/]", classes="user-message")
+            Static(f"[bold #10b981]> {text}[/]", classes="user-message")
         )
 
     def add_agent_message(self, state: dict[str, Any]) -> AgentMessage:
@@ -534,6 +658,25 @@ class XFusionTUI(App):
         event.input.value = ""
         palette = self.query_one("#command-palette", CommandPalette)
         palette.display = False
+
+        # History management
+        self.input_history.append(user_input)
+        self.history_index = -1
+
+        # Direct shell is intentionally unavailable in the TUI; requests must flow
+        # through planning, policy, approval, and the hybrid resolver.
+        if user_input.startswith("!"):
+            self.add_user_message(user_input)
+            self.add_agent_message(
+                {
+                    "response": (
+                        "Direct shell execution is unavailable in the TUI. "
+                        "Describe the operation in natural language so XFusion can choose "
+                        "capability, template, or restricted shell with policy enforcement."
+                    )
+                }
+            )
+            return
 
         # Intercept slash commands
         if user_input.startswith("/"):

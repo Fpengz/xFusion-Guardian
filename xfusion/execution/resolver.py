@@ -14,6 +14,7 @@ from xfusion.execution.restricted_shell import (
     ShellRiskLevel,
 )
 from xfusion.policy.categories import PolicyCategory
+from xfusion.policy.envelope import normalize_command_fingerprint
 
 
 class ExecutionTier(StrEnum):
@@ -93,6 +94,37 @@ class HybridExecutionResolver:
         Returns:
             ResolutionResult with tier selection and metadata
         """
+        del intent  # Agent-supplied candidates carry semantic applicability.
+
+        agent_requested_surface = llm_selected_tool.get("type") if llm_selected_tool else None
+        applicable_capabilities = (
+            llm_selected_tool.get("applicable_capabilities", []) if llm_selected_tool else []
+        )
+        for candidate in applicable_capabilities:
+            if not isinstance(candidate, dict):
+                continue
+            name = candidate.get("name")
+            if isinstance(name, str) and self.capability_registry.has(name):
+                capability = self.capability_registry.require(name)
+                tool_args = candidate.get("arguments", {})
+                risk_category = self._capability_to_policy_category(capability)
+                return ResolutionResult(
+                    tier=ExecutionTier.TIER_1_CAPABILITY,
+                    success=True,
+                    capability_name=name,
+                    risk_level=risk_category,
+                    requires_confirmation=self._requires_confirmation(risk_category),
+                    requires_admin=self._requires_admin(risk_category),
+                    metadata={
+                        "capability": capability.name,
+                        "arguments": tool_args,
+                        "risk_tier": capability.risk_tier.value,
+                        "approval_mode": capability.approval_mode.value,
+                        "surface_order_enforced": True,
+                        "agent_requested_surface": agent_requested_surface,
+                    },
+                )
+
         # Tier 1: Try registered capabilities first
         if llm_selected_tool:
             tool_name = llm_selected_tool.get("name")
@@ -117,13 +149,40 @@ class HybridExecutionResolver:
                     },
                 )
 
+        applicable_templates = (
+            llm_selected_tool.get("applicable_templates", []) if llm_selected_tool else []
+        )
+        for candidate in applicable_templates:
+            if not isinstance(candidate, dict):
+                continue
+            name = candidate.get("name")
+            params = candidate.get("arguments", {})
+            if not isinstance(name, str) or not isinstance(params, dict):
+                continue
+            validation = self.template_engine.validate_parameters(name, params)
+            if validation.valid and validation.resolved_command:
+                template = self.template_engine.get_template(name)
+                if template:
+                    return ResolutionResult(
+                        tier=ExecutionTier.TIER_2_TEMPLATE,
+                        success=True,
+                        template_name=name,
+                        command=validation.resolved_command,
+                        risk_level=template.category,
+                        requires_confirmation=self._requires_confirmation(template.category),
+                        requires_admin=self._requires_admin(template.category),
+                        metadata={
+                            "template": name,
+                            "parameters": params,
+                            "rendered_command": validation.resolved_command,
+                            "surface_order_enforced": True,
+                            "agent_requested_surface": agent_requested_surface,
+                        },
+                    )
+
         # Tier 2: Try structured templates
-        if template_name or (
-            llm_selected_tool and llm_selected_tool.get("type") == "template"
-        ):
-            name = template_name or (
-                llm_selected_tool.get("name") if llm_selected_tool else None
-            )
+        if template_name or (llm_selected_tool and llm_selected_tool.get("type") == "template"):
+            name = template_name or (llm_selected_tool.get("name") if llm_selected_tool else None)
             params = template_params or (
                 llm_selected_tool.get("arguments", {}) if llm_selected_tool else {}
             )
@@ -149,16 +208,25 @@ class HybridExecutionResolver:
                         )
 
         # Tier 3: Restricted shell fallback
-        if shell_command or (
-            llm_selected_tool and llm_selected_tool.get("type") == "shell"
-        ):
+        if shell_command or (llm_selected_tool and llm_selected_tool.get("type") == "shell"):
             command = shell_command or (
                 llm_selected_tool.get("command") if llm_selected_tool else None
             )
 
             if command:
+                fallback_reason = (
+                    llm_selected_tool.get("fallback_reason") if llm_selected_tool else None
+                )
+                if not isinstance(fallback_reason, dict) or not fallback_reason:
+                    return ResolutionResult(
+                        tier=ExecutionTier.TIER_3_RESTRICTED_SHELL,
+                        success=False,
+                        command=command,
+                        error=("Restricted shell fallback requires a structured fallback reason"),
+                    )
                 risk_level = self.shell_executor.classify_command(command)
                 policy_category = self.shell_executor.to_policy_category(risk_level)
+                command_argv = command.split()
 
                 # Check if command is forbidden
                 if risk_level == ShellRiskLevel.FORBIDDEN:
@@ -183,6 +251,8 @@ class HybridExecutionResolver:
                     metadata={
                         "command": command,
                         "risk_level": risk_level.value,
+                        "fallback_reason": fallback_reason,
+                        "raw_command_fingerprint": normalize_command_fingerprint(command_argv),
                     },
                 )
 

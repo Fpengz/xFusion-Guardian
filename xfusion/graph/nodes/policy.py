@@ -10,7 +10,9 @@ from xfusion.policy.approval import (
     build_argument_provenance,
     build_step_binding,
     create_approval_record,
+    stable_hash,
 )
+from xfusion.policy.envelope import build_action_integrity_hash
 from xfusion.policy.rules import (
     build_policy_snapshot_hash,
     build_policy_snapshot_payload,
@@ -96,6 +98,8 @@ def policy_node(state: AgentGraphState) -> AgentGraphState:
     )
 
     step.risk_level = decision.risk_level
+    step.policy_category = decision.policy_category
+    step.final_risk_category = decision.policy_category
     step.requires_confirmation = decision.requires_approval
     step.policy_rule_id = decision.matched_rule_id
     step.approval_mode = decision.approval_mode
@@ -111,6 +115,10 @@ def policy_node(state: AgentGraphState) -> AgentGraphState:
     )
     step.policy_snapshot = policy_snapshot
     step.policy_snapshot_hash = build_policy_snapshot_hash(policy_snapshot)
+    step.intent_hash = stable_hash(
+        {"goal": state.plan.goal, "intent_class": state.plan.intent_class}
+    )
+    step.planned_action_hash = build_action_integrity_hash(step, resolved_args=resolved_args)
     step.non_execution_code = None
     step.non_execution_reason_text = None
 
@@ -168,6 +176,7 @@ def policy_node(state: AgentGraphState) -> AgentGraphState:
         state.pending_approval_id = approval.approval_id
         step.approval_id = approval.approval_id
         step.action_fingerprint = approval.action_fingerprint
+        step.approved_action_hash = step.planned_action_hash
 
         state.plan.interaction_state = InteractionState.AWAITING_CONFIRMATION
         state.plan.status = "awaiting_confirmation"
