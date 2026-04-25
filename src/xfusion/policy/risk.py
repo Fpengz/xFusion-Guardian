@@ -196,6 +196,7 @@ def classify_risk_traits(
         "system.service_start",
         "system.service_stop",
         "system.service_restart",
+        "file.chown",
     }
 
     data_destructive = False
