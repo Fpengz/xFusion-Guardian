@@ -121,17 +121,19 @@ class ListCommand(BaseCommand):
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:
         from rich.table import Table
 
+        from xfusion.app.theme import command_table_styles
         from xfusion.app.tui import Static
         from xfusion.capabilities.registry import build_default_capability_registry
 
         registry = build_default_capability_registry()
         capabilities = registry.all()
 
+        styles = command_table_styles()
         table = Table(title="Registered Capabilities", box=None, show_header=True)
-        table.add_column("Capability", style="bold #10b981")
-        table.add_column("Action", style="#e2e8f0")
-        table.add_column("Risk", style="dim #94a3b8")
-        table.add_column("Approval", style="dim #94a3b8")
+        table.add_column("Capability", style=styles["primary"])
+        table.add_column("Action", style=styles["text"])
+        table.add_column("Risk", style=styles["muted"])
+        table.add_column("Approval", style=styles["muted"])
 
         for cap in sorted(capabilities, key=lambda x: x.name):
             table.add_row(
@@ -153,16 +155,18 @@ class TemplatesCommand(BaseCommand):
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:
         from rich.table import Table
 
+        from xfusion.app.theme import command_table_styles
         from xfusion.app.tui import Static
         from xfusion.capabilities.default_templates import build_default_templates
 
         templates = [template for template in build_default_templates() if template.enabled]
 
+        styles = command_table_styles()
         table = Table(title="Structured Templates", box=None, show_header=True)
-        table.add_column("Template", style="bold #10b981")
-        table.add_column("Category", style="dim #94a3b8")
-        table.add_column("Approval", style="dim #94a3b8")
-        table.add_column("Description", style="#e2e8f0")
+        table.add_column("Template", style=styles["primary"])
+        table.add_column("Category", style=styles["muted"])
+        table.add_column("Approval", style=styles["muted"])
+        table.add_column("Description", style=styles["text"])
 
         for template in sorted(templates, key=lambda item: item.name):
             approval = "required" if template.confirm_required else "auto"

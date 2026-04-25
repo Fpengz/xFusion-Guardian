@@ -20,9 +20,9 @@ class SessionManager:
 
     def save_session(self, session_id: str, state: dict[str, Any]) -> None:
         """Save current state to a session file."""
-        # Convert state dict to AgentGraphState for validation and serialization
-        # (Assuming the dict matches the schema)
-        graph_state = AgentGraphState.model_validate(state)
+        # TUI state may include transient UI-only keys (for example, debug logs).
+        # Persist only fields that are part of the authoritative graph contract.
+        graph_state = AgentGraphState.model_validate(state, extra="ignore")
 
         file_path = self.base_dir / f"{session_id}.json"
         with open(file_path, "w") as f:
@@ -46,7 +46,7 @@ class SessionManager:
 
         with open(file_path) as f:
             content = f.read()
-            return AgentGraphState.model_validate_json(content).model_dump()
+            return AgentGraphState.model_validate_json(content, extra="ignore").model_dump()
 
     def list_sessions(self) -> list[dict[str, Any]]:
         """List all saved sessions with metadata."""

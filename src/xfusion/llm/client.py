@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import logging
+
 import httpx
 
 from xfusion.app.settings import Settings
+
+logger = logging.getLogger(__name__)
 
 
 class LLMClient:
@@ -19,6 +23,7 @@ class LLMClient:
         ):
             # Fallback to deterministic mocks if LLM is not configured
             # In a real production system, this might raise an error or use a local model.
+            logger.debug("llm_client.fallback_mock reason=missing_config")
             return self._mock_fallback(user_prompt)
 
         body = {
@@ -37,12 +42,25 @@ class LLMClient:
 
         url = f"{self.settings.llm_base_url.rstrip('/')}/chat/completions"
 
+        logger.debug(
+            "llm_client.request url=%s model=%s timeout=%.1f",
+            url,
+            self.settings.llm_model,
+            timeout,
+        )
         with httpx.Client(timeout=timeout) as client:
             response = client.post(url, json=body, headers=headers)
+            logger.debug(
+                "llm_client.response status_code=%d content_length=%s",
+                response.status_code,
+                response.headers.get("content-length"),
+            )
             response.raise_for_status()
             data = response.json()
 
-        return str(data["choices"][0]["message"]["content"])
+        content = str(data["choices"][0]["message"]["content"])
+        logger.debug("llm_client.response_parsed content_length=%d", len(content))
+        return content
 
     def _mock_fallback(self, user_prompt: str) -> str:
         """Deterministic mock fallback for development without LLM keys."""

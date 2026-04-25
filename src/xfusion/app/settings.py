@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from typing import Literal, cast
 
+from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -26,6 +27,7 @@ def _response_mode_from_env(raw: str | None) -> Literal["normal", "debug"]:
 
 def load_settings() -> Settings:
     """Load settings from process environment."""
+    load_dotenv()
     return Settings(
         llm_base_url=os.environ.get("XFUSION_LLM_BASE_URL"),
         llm_api_key=os.environ.get("XFUSION_LLM_API_KEY"),

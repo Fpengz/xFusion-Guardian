@@ -5,10 +5,11 @@ description = "Safety-aware Linux admin agent for the XFusion AI Hackathon."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "langgraph>=1,<2",
-    "pydantic>=2.12,<3",
-    "pyyaml>=6.0.2",
-    "textual>=0.86.0",
+    "langgraph>=1.1.8",
+    "pydantic>=2.13.3",
+    "python-dotenv>=1.2.2",
+    "pyyaml>=6.0.3",
+    "textual>=8.2.4",
 ]
 
 [build-system]
@@ -27,11 +28,12 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+src = ["src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]
@@ -41,4 +43,4 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.hatch.build.targets.wheel]
-packages = ["xfusion"]
+packages = ["src/xfusion"]

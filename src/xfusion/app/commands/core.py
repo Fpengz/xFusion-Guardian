@@ -29,12 +29,14 @@ class HelpCommand(BaseCommand):
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:
         from rich.table import Table
 
+        from xfusion.app.theme import command_table_styles
         from xfusion.app.tui import Static
 
+        styles = command_table_styles()
         table = Table(title="Available Commands", box=None, show_header=True)
-        table.add_column("Command", style="bold #10b981")
-        table.add_column("Aliases", style="dim #94a3b8")
-        table.add_column("Description", style="#e2e8f0")
+        table.add_column("Command", style=styles["primary"])
+        table.add_column("Aliases", style=styles["muted"])
+        table.add_column("Description", style=styles["text"])
 
         # We need access to the registry. I'll assume it's attached to the app.
         for cmd in sorted(app.command_registry.get_all(), key=lambda x: x.name):

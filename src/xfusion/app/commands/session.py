@@ -17,6 +17,7 @@ class SessionsCommand(BaseCommand):
     async def handle(self, app: XFusionTUI, args: list[str]) -> None:
         from rich.table import Table
 
+        from xfusion.app.theme import command_table_styles
         from xfusion.app.tui import Static
 
         sessions = app.session_manager.list_sessions()
@@ -24,10 +25,11 @@ class SessionsCommand(BaseCommand):
             app.add_agent_message({"response": "✦ No saved sessions found."})
             return
 
+        styles = command_table_styles()
         table = Table(title="Saved Sessions", box=None, show_header=True)
-        table.add_column("Session ID", style="bold #10b981")
-        table.add_column("Updated At", style="dim #94a3b8")
-        table.add_column("Last Input", style="#e2e8f0")
+        table.add_column("Session ID", style=styles["primary"])
+        table.add_column("Updated At", style=styles["muted"])
+        table.add_column("Last Input", style=styles["text"])
 
         for s in sessions:
             table.add_row(s["id"], s["updated_at"], s["last_input"])
