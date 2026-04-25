@@ -88,6 +88,22 @@ class SystemTools:
         res = self.runner.run(["free", "-h"])
         if res.exit_code == 0:
             return ToolOutput(summary=f"RAM usage:\n{res.stdout}", data={"stdout": res.stdout})
+        uname_res = self.runner.run(["uname", "-s"])
+        if uname_res.exit_code == 0 and uname_res.stdout.strip().lower() == "darwin":
+            vm_res = self.runner.run(["vm_stat"])
+            if vm_res.exit_code == 0:
+                total_memory = self.runner.run(["sysctl", "-n", "hw.memsize"])
+                summary_lines: list[str] = []
+                if total_memory.exit_code == 0 and total_memory.stdout.strip().isdigit():
+                    total_bytes = int(total_memory.stdout.strip())
+                    total_gib = total_bytes / (1024**3)
+                    summary_lines.append(f"Total memory: {total_gib:.1f} GiB")
+                summary_lines.append(vm_res.stdout.strip())
+                rendered = "\n".join(line for line in summary_lines if line).strip() + "\n"
+                return ToolOutput(
+                    summary=f"Darwin memory usage:\n{rendered}",
+                    data={"stdout": rendered},
+                )
         return ToolOutput(
             summary=f"Failed to check RAM usage: {res.stderr}", data={"error": res.stderr}
         )

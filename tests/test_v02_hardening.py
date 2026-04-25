@@ -81,6 +81,19 @@ class FakeRunner(CommandRunner):
         return CommandResult(stdout="operator\n", stderr="", exit_code=0)
 
 
+class RoutingFakeRunner(CommandRunner):
+    def __init__(self, responses: dict[tuple[str, ...], CommandResult]) -> None:
+        self.calls: list[list[str]] = []
+        self.responses = responses
+
+    def run(self, command: list[str], **kwargs: object) -> CommandResult:
+        self.calls.append(command)
+        return self.responses.get(
+            tuple(command),
+            CommandResult(stdout="", stderr="command not stubbed", exit_code=1),
+        )
+
+
 def test_plan_step_rejects_extra_fields() -> None:
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         PlanStep.model_validate(
@@ -98,6 +111,58 @@ def test_system_current_user_output_matches_registered_contract() -> None:
     output = SystemTools(FakeRunner()).current_user()
 
     assert output.data == {"username": "operator"}
+
+
+def test_system_check_ram_uses_linux_free_when_available() -> None:
+    runner = RoutingFakeRunner(
+        {
+            ("free", "-h"): CommandResult(
+                stdout="Mem:  16Gi  8Gi  4Gi  512Mi  4Gi  7Gi\n",
+                stderr="",
+                exit_code=0,
+            )
+        }
+    )
+
+    output = SystemTools(runner).check_ram()
+
+    assert output.data == {"stdout": "Mem:  16Gi  8Gi  4Gi  512Mi  4Gi  7Gi\n"}
+    assert runner.calls == [["free", "-h"]]
+
+
+def test_system_check_ram_falls_back_to_darwin_vm_stat() -> None:
+    runner = RoutingFakeRunner(
+        {
+            ("free", "-h"): CommandResult(stdout="", stderr="command not found", exit_code=127),
+            ("uname", "-s"): CommandResult(stdout="Darwin\n", stderr="", exit_code=0),
+            ("vm_stat",): CommandResult(
+                stdout=(
+                    "Mach Virtual Memory Statistics: (page size of 16384 bytes)\n"
+                    "Pages free:                               1024.\n"
+                    "Pages active:                             2048.\n"
+                    "Pages inactive:                           512.\n"
+                    "Pages speculative:                        256.\n"
+                    "Pages wired down:                         128.\n"
+                    "Pages occupied by compressor:             64.\n"
+                ),
+                stderr="",
+                exit_code=0,
+            ),
+            ("sysctl", "-n", "hw.memsize"): CommandResult(
+                stdout="17179869184\n",
+                stderr="",
+                exit_code=0,
+            ),
+        }
+    )
+
+    output = SystemTools(runner).check_ram()
+    stdout = str(output.data["stdout"])
+
+    assert "Darwin memory usage" in output.summary
+    assert "Total memory: 16.0 GiB" in stdout
+    assert "Pages active:" in stdout
+    assert "error" not in output.data
 
 
 def test_process_kill_uses_declared_signal_enum_and_structured_success() -> None:
