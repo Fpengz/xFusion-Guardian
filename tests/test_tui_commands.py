@@ -13,7 +13,7 @@ from textual.widgets import Input
 from xfusion.app.commands.core import ExitCommand, HelpCommand, ResetCommand
 from xfusion.app.commands.info import AuditCommand, ListCommand, TemplatesCommand
 from xfusion.app.commands.registry import CommandRegistry
-from xfusion.app.tui import AgentMessage, StepWidget, TuiDebugLogHandler, XFusionTUI
+from xfusion.app.tui import AgentMessage, AgentUpdate, StepWidget, TuiDebugLogHandler, XFusionTUI
 from xfusion.app.turns import non_operational_response
 from xfusion.app.widgets.modals import ApprovalModal
 from xfusion.app.widgets.palette import CommandItem, CommandPalette
@@ -21,12 +21,13 @@ from xfusion.conversation.gateway import ClarificationResponse, IntentDecision
 from xfusion.domain.enums import (
     ApprovalMode,
     ExecutionSurface,
+    InteractionState,
     PolicyCategory,
     PolicyDecisionValue,
     RiskTier,
     StepStatus,
 )
-from xfusion.domain.models.execution_plan import PlanStep
+from xfusion.domain.models.execution_plan import ExecutionPlan, PlanStep
 from xfusion.domain.models.policy import PolicyDecision, StepRiskContract
 
 
@@ -219,6 +220,46 @@ def test_approval_modal_blank_submit_stays_open_and_shows_hint():
 
     dismiss.assert_not_called()
     help_text.update.assert_called_once()
+
+
+def test_tui_only_opens_approval_modal_when_policy_requests_it():
+    app = XFusionTUI()
+    app.active_agent_block = MagicMock()
+    app.session_manager = MagicMock()
+    push_screen = MagicMock()
+    cast(Any, app).push_screen = push_screen
+    cast(Any, app).query_one = MagicMock(return_value=MagicMock())
+    cast(Any, app).session_id = "test-session"
+
+    plan = ExecutionPlan(
+        plan_id="awaiting-confirmation",
+        goal="stop process",
+        language="en",
+        interaction_state=InteractionState.AWAITING_CONFIRMATION,
+        status="awaiting_confirmation",
+        steps=[
+            PlanStep(
+                step_id="kill",
+                capability="process.kill",
+                args={"pid": 1234, "signal": "TERM"},
+                on_failure="stop",
+            )
+        ],
+    )
+    state = {
+        "plan": plan,
+        "pending_confirmation_phrase": "APPROVE apr_123 abcdef123456",
+        "audit_records": [],
+    }
+    cast(Any, app).state = state
+
+    app.on_agent_update(AgentUpdate(state, "parse"))
+
+    push_screen.assert_not_called()
+
+    app.on_agent_update(AgentUpdate(state, "policy"))
+
+    push_screen.assert_called_once()
 
 
 @pytest.mark.anyio

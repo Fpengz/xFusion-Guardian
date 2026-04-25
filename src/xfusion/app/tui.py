@@ -491,7 +491,10 @@ class XFusionTUI(App):
             if plan.interaction_state in term_states:
                 self.session_manager.save_session(self.session_id, self.state)
 
-            if plan.interaction_state == InteractionState.AWAITING_CONFIRMATION:
+            if (
+                plan.interaction_state == InteractionState.AWAITING_CONFIRMATION
+                and message.node_name == "policy"
+            ):
                 phrase = message.state.get("pending_confirmation_phrase")
                 if phrase:
                     self.push_screen(ApprovalModal(phrase), callback=self.on_approval_submitted)
