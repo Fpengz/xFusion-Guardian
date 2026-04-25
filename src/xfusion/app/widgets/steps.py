@@ -89,36 +89,40 @@ class StepWidget(Static):
         final_risk = self._risk_label()
         args_str = ", ".join(f"{key}={value}" for key, value in self.step.args.items())
 
-        result.append("\n  Surface: ", style="dim")
-        result.append(self.step.execution_surface.value, style="dim")
-        result.append("\n  Policy: ", style="dim")
-        result.append(policy_category, style="dim")
-        result.append("\n  Final risk: ", style="dim")
-        result.append(final_risk, style="dim")
-        result.append("\n  Escalated: ", style="dim")
-        result.append(escalated, style="dim")
-        result.append("\n  Approval: ", style="dim")
-        result.append(self._approval_label().replace("-", " "), style="dim")
+        result.append("\n  Runtime:", style="bold")
+        result.append(
+            "\n    "
+            f"surface={self.step.execution_surface.value}  "
+            f"policy={policy_category}  "
+            f"final_risk={final_risk}  "
+            f"escalated={escalated}  "
+            f"approval={self._approval_label().replace('-', ' ')}",
+            style="dim",
+        )
 
         if self.step.fallback_reason:
-            result.append("\n  Fallback: ", style="dim")
-            result.append(self.step.fallback_reason, style="dim")
+            result.append("\n  Fallback:", style="bold")
+            result.append(f"\n    {self.step.fallback_reason}", style="dim")
 
         fingerprint = self.step.resolution_record.get("raw_command_fingerprint")
         if fingerprint:
-            result.append("\n  Fingerprint: ", style="dim")
-            result.append(str(fingerprint), style="dim")
+            result.append("\n  Fingerprint:", style="bold")
+            result.append(f"\n    {fingerprint}", style="dim")
 
-        result.append("\n  $ ", style="dim")
-        result.append(f"{self.step.capability} {args_str}", style="dim")
+        result.append("\n  Request:", style="bold")
+        command_text = (
+            self.step.capability if not args_str else f"{self.step.capability} {args_str}"
+        )
+        result.append(f"\n    $ {command_text}", style="dim")
 
-        for entry in self.step.command_trace[-2:]:
+        for index, entry in enumerate(self.step.command_trace[-2:], start=1):
+            result.append(f"\n  Trace {index}:", style="bold")
             argv = entry.get("ran_argv") or entry.get("planned_argv")
             if isinstance(argv, list):
-                result.append("\n  argv: " + " ".join(str(part) for part in argv), style="dim")
+                result.append("\n    argv=" + " ".join(str(part) for part in argv), style="dim")
             stdout = str(entry.get("stdout_excerpt") or "").strip()
             stderr = str(entry.get("stderr_excerpt") or "").strip()
             if stdout:
-                result.append("\n  stdout: " + stdout[:240], style="dim")
+                result.append("\n    stdout: " + stdout[:240], style="dim")
             if stderr:
-                result.append("\n  stderr: " + stderr[:240], style="dim red")
+                result.append("\n    stderr: " + stderr[:240], style="dim red")

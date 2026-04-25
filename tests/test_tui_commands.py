@@ -16,8 +16,16 @@ from xfusion.app.turns import non_operational_response
 from xfusion.app.widgets.modals import ApprovalModal
 from xfusion.app.widgets.palette import CommandItem, CommandPalette
 from xfusion.conversation.gateway import ClarificationResponse, IntentDecision
-from xfusion.domain.enums import ExecutionSurface, PolicyCategory, StepStatus
+from xfusion.domain.enums import (
+    ApprovalMode,
+    ExecutionSurface,
+    PolicyCategory,
+    PolicyDecisionValue,
+    RiskTier,
+    StepStatus,
+)
 from xfusion.domain.models.execution_plan import PlanStep
+from xfusion.domain.models.policy import PolicyDecision, StepRiskContract
 
 
 def test_command_registry():
@@ -105,14 +113,52 @@ def test_step_widget_debug_mode_renders_hybrid_policy_and_runtime_metadata():
 
     rendered = StepWidget(step, {"summary": "Kernel details captured."}, debug=True).render().plain
 
-    assert "Surface: restricted_shell" in rendered
-    assert "Policy: write_safe" in rendered
-    assert "Final risk: privileged" in rendered
-    assert "Escalated: yes" in rendered
-    assert "Fallback: No registered capability" in rendered
-    assert "Approval: approved" in rendered
-    assert "argv: uname -a" in rendered
+    assert "Runtime:" in rendered
+    assert "surface=restricted_shell" in rendered
+    assert "policy=write_safe" in rendered
+    assert "final_risk=privileged" in rendered
+    assert "escalated=yes" in rendered
+    assert "approval=approved" in rendered
+    assert "Request:" in rendered
+    assert "$ shell.fallback command=uname -a" in rendered
+    assert "Trace 1:" in rendered
+    assert "argv=uname -a" in rendered
     assert "stdout: Darwin host 25.0.0" in rendered
+    assert "Fallback:" in rendered
+
+
+def test_agent_message_formats_policy_decision_as_structured_debug_block():
+    decision = PolicyDecision(
+        decision=PolicyDecisionValue.ALLOW,
+        execution_surface=ExecutionSurface.CAPABILITY,
+        policy_category=PolicyCategory.READ_ONLY,
+        matched_rule_id="read_only.allow",
+        risk_tier=RiskTier.TIER_0,
+        approval_mode=ApprovalMode.AUTO,
+        constraints_applied=["bounded_scope"],
+        reason_codes=["read_only"],
+        confirmation_type="none",
+        explainability_record={},
+        reason_text="Read-only process inspection is allowed.",
+        reason="Read-only process inspection is allowed.",
+        risk_contract=StepRiskContract(
+            risk_level="low",
+            requires_confirmation=False,
+            confirmation_type="none",
+            reversibility="reversible",
+            privilege_required=False,
+        ),
+    )
+
+    rendered = AgentMessage({})._format_policy_decision(decision)
+
+    assert "Policy Decision:" in rendered
+    assert "decision=allow" in rendered
+    assert "surface=capability" in rendered
+    assert "category=read_only" in rendered
+    assert "rule=read_only.allow" in rendered
+    assert "approval=auto" in rendered
+    assert "reason=Read-only process inspection is allowed." in rendered
 
 
 class PaletteHarness(App):
@@ -254,6 +300,65 @@ def test_agent_message_debug_mode_renders_gateway_logs():
     line = cast(Any, rendered[1].render())
     assert header.plain == "Debug Logs:"
     assert "conversation_gateway.llm_request" in line.plain
+
+
+def test_agent_message_debug_widgets_render_validation_errors_as_plain_text():
+    validation_error = (
+        "[WARNING] xfusion.conversation.gateway: 1 validation error for IntentDecision\n"
+        "mode\n"
+        "  Input should be 'operational', 'conversational' or 'clarify' "
+        "[type=literal_error, input_value={'Intent': 'Monitor', 'Action': 'collect'}, "
+        "input_type=dict]"
+    )
+    state = {
+        "response_mode": "debug",
+        "response": "debug response",
+        "debug_logs": [validation_error],
+    }
+    message = AgentMessage(state)
+
+    rendered = message._debug_log_widgets(state)
+    line = cast(Any, rendered[1].render())
+
+    assert "validation error for IntentDecision" in line.plain
+    assert "input_value={'Intent': 'Monitor', 'Action': 'collect'}" in line.plain
+
+
+def test_tui_threads_pending_gateway_clarification_context_into_follow_up_input():
+    app = XFusionTUI()
+    app.state = {
+        "pending_gateway_context": {
+            "context_input": "Free up disk space quickly. Just delete all logs under /var/log.",
+            "question": "Are you sure you want to delete all logs under /var/log?",
+        }
+    }
+
+    effective_input, used_pending = app._build_gateway_input("yes")
+
+    assert used_pending is True
+    assert "Previous user request: Free up disk space quickly." in effective_input
+    assert (
+        "Clarification asked: Are you sure you want to delete all logs under /var/log?"
+        in effective_input
+    )
+    assert "User follow-up: yes" in effective_input
+
+
+def test_tui_negative_reply_to_pending_gateway_clarification_returns_safe_cancellation():
+    app = XFusionTUI()
+    app.state = {
+        "pending_gateway_context": {
+            "context_input": "Free up disk space quickly. Just delete all logs under /var/log.",
+            "question": "Are you sure you want to delete all logs under /var/log?",
+        }
+    }
+
+    response = app._pending_gateway_reply_override("no")
+
+    assert response == (
+        "Understood. I won't delete logs under /var/log. "
+        "If you still want to free space, tell me a safer, bounded cleanup scope."
+    )
 
 
 @pytest.mark.anyio

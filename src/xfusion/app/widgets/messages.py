@@ -16,7 +16,7 @@ class UserMessage(Static):
     """Compact renderable for user turns."""
 
     def __init__(self, text: str) -> None:
-        super().__init__(f"[bold]>[/] {text}", classes="user-message")
+        super().__init__(f"> {text}", classes="user-message", markup=False)
 
 
 class AgentMessage(Static):
@@ -28,7 +28,7 @@ class AgentMessage(Static):
         self.turn_header = Label("Guardian", id="turn-header")
         self.plan_label = Label("", id="plan-info")
         self.steps_container = Vertical(id="steps")
-        self.policy_label = Static("", id="policy-info")
+        self.policy_label = Static("", id="policy-info", markup=False)
         self.explanation_container = Vertical(
             Label("", id="interpretation-header"),
             Static("", id="explanation"),
@@ -82,7 +82,7 @@ class AgentMessage(Static):
 
         decision = state.get("policy_decision")
         if not gateway_mode and decision and debug:
-            self.policy_label.update(f"Policy: {decision}")
+            self.policy_label.update(self._format_policy_decision(decision))
             self.policy_label.display = True
         else:
             self.policy_label.display = False
@@ -95,7 +95,7 @@ class AgentMessage(Static):
                 self.debug_container.mount(Label("Audit trace", classes="debug-header"))
                 for rec in audit_records[-5:]:
                     msg = rec.get("message", str(rec))
-                    self.debug_container.mount(Static(f"[dim]• {msg}[/]", classes="debug-entry"))
+                    self.debug_container.mount(self._debug_line_widget(str(msg)))
         if debug:
             for widget in self._debug_log_widgets(state):
                 self.debug_container.mount(widget)
@@ -123,5 +123,32 @@ class AgentMessage(Static):
             return []
         widgets: list[Static | Label] = [Label("Debug Logs:", classes="debug-header")]
         for line in logs[-12:]:
-            widgets.append(Static(f"[dim]• {line}[/]", classes="debug-entry"))
+            widgets.append(self._debug_line_widget(str(line)))
         return widgets
+
+    def _debug_line_widget(self, line: str) -> Static:
+        return Static(f"• {line}", classes="debug-entry", markup=False)
+
+    def _format_policy_decision(self, decision: Any) -> str:
+        decision_value = getattr(getattr(decision, "decision", None), "value", None) or str(
+            getattr(decision, "decision", "unknown")
+        )
+        surface = getattr(getattr(decision, "execution_surface", None), "value", None) or str(
+            getattr(decision, "execution_surface", "unknown")
+        )
+        category = getattr(getattr(decision, "policy_category", None), "value", None) or str(
+            getattr(decision, "policy_category", "unknown")
+        )
+        approval = getattr(getattr(decision, "approval_mode", None), "value", None) or str(
+            getattr(decision, "approval_mode", "unknown")
+        )
+        rule = str(getattr(decision, "matched_rule_id", "unknown"))
+        reason = str(getattr(decision, "reason_text", "")).strip()
+        lines = [
+            "Policy Decision:",
+            f"  decision={decision_value}  surface={surface}  category={category}",
+            f"  rule={rule}  approval={approval}",
+        ]
+        if reason:
+            lines.append(f"  reason={reason}")
+        return "\n".join(lines)

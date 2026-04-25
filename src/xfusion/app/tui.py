@@ -7,6 +7,7 @@ from collections import deque
 from collections.abc import Iterable
 from typing import Any, cast
 
+from rich.markup import escape
 from textual import events, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -52,6 +53,17 @@ from xfusion.tools.registry import ToolRegistry
 from xfusion.tools.system import SystemTools
 
 logger = logging.getLogger(__name__)
+
+NEGATIVE_GATEWAY_REPLIES = {
+    "n",
+    "no",
+    "nope",
+    "cancel",
+    "stop",
+    "abort",
+    "never mind",
+    "nevermind",
+}
 
 __all__ = [
     "AgentMessage",
@@ -237,6 +249,7 @@ class XFusionTUI(App):
             "audit_records": [],
             "debug_logs": self.recent_debug_logs(),
             "audit_log_path": settings.audit_log_path,
+            "pending_gateway_context": None,
         }
         self.update_environment_display()
 
@@ -381,8 +394,28 @@ class XFusionTUI(App):
                 }
             )
 
+        override_response = self._pending_gateway_reply_override(user_input)
+        if override_response is not None:
+            self.state["pending_gateway_context"] = None
+            self.add_agent_message(
+                {
+                    "response": override_response,
+                    "response_mode": self.state.get("response_mode", "normal"),
+                    "gateway_mode": "conversational",
+                    "plan": None,
+                    "policy_decision": None,
+                    "audit_records": [],
+                    "debug_logs": self.recent_debug_logs(),
+                }
+            )
+            return
+
+        effective_user_input, used_pending_gateway_context = self._build_gateway_input(user_input)
+
         decision = enforce_routing_safety(
-            self.gateway.classify(user_input, language=str(self.state.get("language", "en")))
+            self.gateway.classify(
+                effective_user_input, language=str(self.state.get("language", "en"))
+            )
         )
         logger.debug(
             "tui.gateway_decision mode=%s requires_execution=%s confidence=%.3f",
@@ -392,6 +425,13 @@ class XFusionTUI(App):
         )
         if decision.mode != "operational" or not decision.requires_execution:
             gateway_response = non_operational_response(decision)
+            if gateway_response.mode == "clarify" and gateway_response.clarification is not None:
+                self.state["pending_gateway_context"] = {
+                    "context_input": effective_user_input,
+                    "question": gateway_response.clarification.question,
+                }
+            else:
+                self.state["pending_gateway_context"] = None
             logger.info(
                 "tui.render_non_operational_response mode=%s requires_execution=false",
                 gateway_response.mode,
@@ -411,10 +451,14 @@ class XFusionTUI(App):
             )
             return
 
-        self.state["user_input"] = user_input
+        self.state["pending_gateway_context"] = None
+        self.state["user_input"] = effective_user_input
         self.state["debug_logs"] = self.recent_debug_logs()
         self.active_agent_block = self.add_agent_message(self.state)
-        logger.info("tui.run_agent_start mode=operational requires_execution=true")
+        logger.info(
+            "tui.run_agent_start mode=operational requires_execution=true pending_context=%s",
+            "used" if used_pending_gateway_context else "unused",
+        )
         self.run_agent()
 
     @work(thread=True)
@@ -486,10 +530,46 @@ class XFusionTUI(App):
             return
         self.state["debug_logs"] = self.recent_debug_logs()
         try:
-            self.query_one("#side-audit", RichLog).write(f"[dim]Log:[/] {line}")
+            self.query_one("#side-audit", RichLog).write(f"[dim]Log:[/] {escape(line)}")
         except Exception:
             return
 
     def recent_debug_logs(self) -> list[str]:
         lines: Iterable[str] = getattr(self, "debug_log_lines", [])
         return list(lines)[-12:]
+
+    def _build_gateway_input(self, user_input: str) -> tuple[str, bool]:
+        pending = self.state.get("pending_gateway_context")
+        if not isinstance(pending, dict):
+            return user_input, False
+        context_input = str(pending.get("context_input", "")).strip()
+        question = str(pending.get("question", "")).strip()
+        if not context_input or not question:
+            return user_input, False
+        return (
+            "Previous user request: "
+            f"{context_input}\n"
+            "Clarification asked: "
+            f"{question}\n"
+            "User follow-up: "
+            f"{user_input}",
+            True,
+        )
+
+    def _pending_gateway_reply_override(self, user_input: str) -> str | None:
+        pending = self.state.get("pending_gateway_context")
+        if not isinstance(pending, dict):
+            return None
+        normalized = " ".join(user_input.strip().lower().split())
+        if normalized not in NEGATIVE_GATEWAY_REPLIES:
+            return None
+        context_input = str(pending.get("context_input", "")).strip()
+        if "/var/log" in context_input:
+            return (
+                "Understood. I won't delete logs under /var/log. "
+                "If you still want to free space, tell me a safer, bounded cleanup scope."
+            )
+        return (
+            "Understood. I won't do that. "
+            "If you'd like, tell me a safer or more specific alternative."
+        )
