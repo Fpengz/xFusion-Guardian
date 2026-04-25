@@ -155,7 +155,7 @@ class ConversationGateway:
         user_prompt = (
             f"Language: {language}\n"
             f"User input: {redacted_input}\n\n"
-            "Return only JSON matching the IntentDecision contract."
+            f"{_intent_decision_contract_prompt()}\n"
         )
         logger.debug(
             "conversation_gateway.llm_request system_prompt=%s user_prompt=%s",
@@ -239,3 +239,28 @@ def _parse_json_object(raw: str) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise ValueError("gateway output must be a JSON object")
     return parsed
+
+
+def _intent_decision_contract_prompt() -> str:
+    return (
+        "Return only JSON matching this IntentDecision contract.\n"
+        'Top-level keys must be exactly: "mode", "requires_execution", '
+        '"confidence", "rationale", and "clarification".\n'
+        'Use "mode" as one of: "conversational", "operational", or "clarify".\n'
+        '"requires_execution" must be true only for "operational" mode.\n'
+        '"confidence" must be a number from 0.0 to 1.0.\n'
+        '"rationale" must be a short string.\n'
+        '"clarification" must be null unless mode is "clarify"; when mode is '
+        '"clarify" it must be an object with "question", "missing_fields", and '
+        '"risk_hint".\n'
+        "Do not return extracted intent fields such as action, resource, metric, "
+        "context, target, or intent.\n"
+        "Example operational response:\n"
+        "{"
+        '"mode":"operational",'
+        '"requires_execution":true,'
+        '"confidence":0.93,'
+        '"rationale":"Clear bounded inspection request.",'
+        '"clarification":null'
+        "}"
+    )

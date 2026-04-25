@@ -28,6 +28,43 @@ class FakeLLMClient:
         return self.response
 
 
+class PromptSensitiveLLMClient:
+    """Simulate a model that falls back to legacy intent extraction unless constrained."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    def complete(self, system_prompt: str, user_prompt: str, timeout: float = 20.0) -> str:
+        self.calls.append((system_prompt, user_prompt))
+        prompt = f"{system_prompt}\n{user_prompt}"
+        if all(
+            token in prompt
+            for token in (
+                '"mode"',
+                '"requires_execution"',
+                '"confidence"',
+                '"rationale"',
+                "Do not return extracted intent fields",
+            )
+        ):
+            return json.dumps(
+                {
+                    "mode": "operational",
+                    "requires_execution": True,
+                    "confidence": 0.93,
+                    "rationale": "Clear bounded disk inspection request.",
+                }
+            )
+        return json.dumps(
+            {
+                "action": "monitor",
+                "resource": "disk",
+                "metric": "pressure",
+                "context": "check",
+            }
+        )
+
+
 def _gateway(payload: dict[str, object]) -> ConversationGateway:
     return ConversationGateway(llm_client=FakeLLMClient(json.dumps(payload)))
 
@@ -193,6 +230,22 @@ def test_gateway_logs_fail_closed_reason(caplog: pytest.LogCaptureFixture) -> No
     messages = "\n".join(record.getMessage() for record in caplog.records)
     assert "conversation_gateway.fail_closed" in messages
     assert "classification_error" in messages
+
+
+def test_gateway_prompt_constrains_model_away_from_legacy_intent_extraction_shape() -> None:
+    llm = PromptSensitiveLLMClient()
+
+    decision = ConversationGateway(llm_client=llm).classify("check the disk pressure.")
+
+    assert decision.mode == "operational"
+    assert decision.requires_execution is True
+    assert llm.calls
+    user_prompt = llm.calls[0][1]
+    assert '"mode"' in user_prompt
+    assert '"requires_execution"' in user_prompt
+    assert '"confidence"' in user_prompt
+    assert '"rationale"' in user_prompt
+    assert "Do not return extracted intent fields" in user_prompt
 
 
 def test_gateway_uses_structured_prompt_os_system_prompt(tmp_path: Path) -> None:
