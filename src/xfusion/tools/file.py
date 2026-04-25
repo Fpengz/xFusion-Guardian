@@ -143,3 +143,144 @@ class FileTools:
                 "truncated": target.stat().st_size > len(data),
             },
         )
+
+    def append_file(self, path: str, content: str) -> ToolOutput:
+        """Append content to a file."""
+        if is_secret_path(path):
+            return ToolOutput(
+                summary="Refusing to write to known secret path.",
+                data={"error": "secret_path"},
+            )
+        target = Path(path)
+        try:
+            with target.open("a") as f:
+                f.write(content)
+            return ToolOutput(
+                summary=f"Appended {len(content)} bytes to {path}.",
+                data={"path": path, "bytes_written": len(content)},
+            )
+        except Exception as e:
+            return ToolOutput(
+                summary=f"Failed to append to {path}: {e}",
+                data={"error": str(e)},
+            )
+
+    def write_file(self, path: str, content: str) -> ToolOutput:
+        """Create or overwrite a file with content."""
+        if is_secret_path(path):
+            return ToolOutput(
+                summary="Refusing to write to known secret path.",
+                data={"error": "secret_path"},
+            )
+        target = Path(path)
+        try:
+            target.write_text(content)
+            return ToolOutput(
+                summary=f"Wrote {len(content)} bytes to {path}.",
+                data={"path": path, "bytes_written": len(content)},
+            )
+        except Exception as e:
+            return ToolOutput(
+                summary=f"Failed to write to {path}: {e}",
+                data={"error": str(e)},
+            )
+
+    def delete(self, path: str) -> ToolOutput:
+        """Delete a file or directory."""
+        target = Path(path)
+        try:
+            if target.is_dir():
+                import shutil
+
+                shutil.rmtree(target)
+            else:
+                target.unlink()
+            return ToolOutput(
+                summary=f"Deleted {path}.",
+                data={"path": path, "deleted": True},
+            )
+        except Exception as e:
+            return ToolOutput(
+                summary=f"Failed to delete {path}: {e}",
+                data={"error": str(e)},
+            )
+
+    def move(self, source: str, destination: str) -> ToolOutput:
+        """Move or rename a file or directory."""
+        src = Path(source)
+        dst = Path(destination)
+        try:
+            import shutil
+
+            shutil.move(str(src), str(dst))
+            return ToolOutput(
+                summary=f"Moved {source} to {destination}.",
+                data={"source": source, "destination": destination},
+            )
+        except Exception as e:
+            return ToolOutput(
+                summary=f"Failed to move {source}: {e}",
+                data={"error": str(e)},
+            )
+
+    def copy(self, source: str, destination: str) -> ToolOutput:
+        """Copy a file or directory."""
+        src = Path(source)
+        dst = Path(destination)
+        try:
+            import shutil
+
+            if src.is_dir():
+                shutil.copytree(str(src), str(dst))
+            else:
+                shutil.copy2(str(src), str(dst))
+            return ToolOutput(
+                summary=f"Copied {source} to {destination}.",
+                data={"source": source, "destination": destination},
+            )
+        except Exception as e:
+            return ToolOutput(
+                summary=f"Failed to copy {source}: {e}",
+                data={"error": str(e)},
+            )
+
+    def chmod(self, path: str, mode: str) -> ToolOutput:
+        """Change file mode bits."""
+        target = Path(path)
+        try:
+            # Simple conversion if octal string
+            if mode.isdigit() and len(mode) in {3, 4}:
+                target.chmod(int(mode, 8))
+            else:
+                # Symbolic mode - fall back to shell as it's complex to parse in pure python
+                res = self.runner.run(["chmod", mode, path])
+                if res.exit_code != 0:
+                    raise Exception(res.stderr)
+            return ToolOutput(
+                summary=f"Changed mode of {path} to {mode}.",
+                data={"path": path, "mode": mode},
+            )
+        except Exception as e:
+            return ToolOutput(
+                summary=f"Failed to chmod {path}: {e}",
+                data={"error": str(e)},
+            )
+
+    def chown(self, path: str, owner: str) -> ToolOutput:
+        """Change file owner and group."""
+        try:
+            res = self.runner.run(["sudo", "chown", owner, path])
+            if res.exit_code == 0:
+                return ToolOutput(
+                    summary=f"Changed owner of {path} to {owner}.",
+                    data={"path": path, "owner": owner},
+                )
+            return ToolOutput(
+                summary=f"Failed to chown {path}: {res.stderr}",
+                data={"error": res.stderr},
+            )
+        except Exception as e:
+            return ToolOutput(
+                summary=f"Failed to chown {path}: {e}",
+                data={"error": str(e)},
+            )

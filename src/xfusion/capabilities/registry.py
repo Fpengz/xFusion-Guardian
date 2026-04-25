@@ -228,6 +228,42 @@ def build_default_capability_registry() -> CapabilityRegistry:
             verification_recommendation="state_re_read",
         ),
         _capability(
+            name="system.service_reload",
+            verb="reload",
+            object_name="service",
+            risk_tier=RiskTier.TIER_1,
+            approval_mode=ApprovalMode.HUMAN,
+            is_read_only=False,
+            input_schema=_schema({"service": _string(max_length=128)}, ["service"]),
+            output_schema=_schema(
+                {"service": _string(max_length=128), "status": _string(max_length=64)}
+            ),
+            verification_recommendation="state_re_read",
+        ),
+        _capability(
+            name="system.list_services",
+            verb="read",
+            object_name="service",
+            risk_tier=RiskTier.TIER_0,
+            approval_mode=ApprovalMode.AUTO,
+            is_read_only=True,
+            input_schema=_schema({}),
+            output_schema=_schema({"stdout": _string(min_length=0, max_length=100_000)}),
+        ),
+        _capability(
+            name="system.restart_failed_services",
+            verb="restart",
+            object_name="service",
+            risk_tier=RiskTier.TIER_1,
+            approval_mode=ApprovalMode.HUMAN,
+            is_read_only=False,
+            input_schema=_schema({}),
+            output_schema=_schema(
+                {"restarted": _array(max_items=128), "errors": _array(max_items=128)}
+            ),
+            verification_recommendation="command_exit_status_plus_state",
+        ),
+        _capability(
             name="disk.check_usage",
             verb="read",
             object_name="disk",
@@ -323,6 +359,131 @@ def build_default_capability_registry() -> CapabilityRegistry:
             ),
         ),
         _capability(
+            name="file.append_file",
+            verb="write",
+            object_name="file",
+            risk_tier=RiskTier.TIER_1,
+            approval_mode=ApprovalMode.HUMAN,
+            is_read_only=False,
+            input_schema=_schema(
+                {"path": _string(max_length=4096), "content": _string(max_length=1_000_000)},
+                ["path", "content"],
+            ),
+            output_schema=_schema(
+                {
+                    "path": _string(max_length=4096),
+                    "bytes_written": _integer(minimum=0, maximum=1_000_000),
+                    "error": _string(min_length=0, max_length=100_000),
+                }
+            ),
+            verification_recommendation="state_re_read",
+        ),
+        _capability(
+            name="file.write_file",
+            verb="write",
+            object_name="file",
+            risk_tier=RiskTier.TIER_1,
+            approval_mode=ApprovalMode.HUMAN,
+            is_read_only=False,
+            input_schema=_schema(
+                {"path": _string(max_length=4096), "content": _string(max_length=1_000_000)},
+                ["path", "content"],
+            ),
+            output_schema=_schema(
+                {
+                    "path": _string(max_length=4096),
+                    "bytes_written": _integer(minimum=0, maximum=1_000_000),
+                    "error": _string(min_length=0, max_length=100_000),
+                }
+            ),
+            verification_recommendation="state_re_read",
+        ),
+        _capability(
+            name="file.delete",
+            verb="delete",
+            object_name="file",
+            risk_tier=RiskTier.TIER_2,
+            approval_mode=ApprovalMode.ADMIN,
+            is_read_only=False,
+            input_schema=_schema({"path": _string(max_length=4096)}, ["path"]),
+            output_schema=_schema(
+                {"path": _string(max_length=4096), "deleted": _bool(), "error": _string()}
+            ),
+            verification_recommendation="existence_nonexistence_check",
+        ),
+        _capability(
+            name="file.move",
+            verb="move",
+            object_name="file",
+            risk_tier=RiskTier.TIER_1,
+            approval_mode=ApprovalMode.HUMAN,
+            is_read_only=False,
+            input_schema=_schema(
+                {"source": _string(max_length=4096), "destination": _string(max_length=4096)},
+                ["source", "destination"],
+            ),
+            output_schema=_schema(
+                {
+                    "source": _string(max_length=4096),
+                    "destination": _string(max_length=4096),
+                    "error": _string(),
+                }
+            ),
+            verification_recommendation="filesystem_metadata_recheck",
+        ),
+        _capability(
+            name="file.copy",
+            verb="copy",
+            object_name="file",
+            risk_tier=RiskTier.TIER_1,
+            approval_mode=ApprovalMode.HUMAN,
+            is_read_only=False,
+            input_schema=_schema(
+                {"source": _string(max_length=4096), "destination": _string(max_length=4096)},
+                ["source", "destination"],
+            ),
+            output_schema=_schema(
+                {
+                    "source": _string(max_length=4096),
+                    "destination": _string(max_length=4096),
+                    "error": _string(),
+                }
+            ),
+            verification_recommendation="filesystem_metadata_recheck",
+        ),
+        _capability(
+            name="file.chmod",
+            verb="write",
+            object_name="file",
+            risk_tier=RiskTier.TIER_1,
+            approval_mode=ApprovalMode.HUMAN,
+            is_read_only=False,
+            input_schema=_schema(
+                {"path": _string(max_length=4096), "mode": _string(max_length=32)},
+                ["path", "mode"],
+            ),
+            output_schema=_schema(
+                {"path": _string(max_length=4096), "mode": _string(max_length=32)}
+            ),
+            verification_recommendation="filesystem_metadata_recheck",
+        ),
+        _capability(
+            name="file.chown",
+            verb="write",
+            object_name="file",
+            risk_tier=RiskTier.TIER_1,
+            approval_mode=ApprovalMode.HUMAN,
+            is_read_only=False,
+            input_schema=_schema(
+                {"path": _string(max_length=4096), "owner": _string(max_length=128)},
+                ["path", "owner"],
+            ),
+            output_schema=_schema(
+                {"path": _string(max_length=4096), "owner": _string(max_length=128)}
+            ),
+            verification_recommendation="filesystem_metadata_recheck",
+        ),
+        _capability(
             name="process.list",
             verb="read",
             object_name="process",
@@ -381,6 +542,53 @@ def build_default_capability_registry() -> CapabilityRegistry:
                     "error": _string(min_length=0, max_length=100_000),
                 },
                 ["ok"],
+            ),
+            verification_recommendation="command_exit_status_plus_state",
+        ),
+        _capability(
+            name="process.inspect",
+            verb="read",
+            object_name="process",
+            risk_tier=RiskTier.TIER_0,
+            approval_mode=ApprovalMode.AUTO,
+            is_read_only=True,
+            input_schema=_schema({"pid": _integer(minimum=1, maximum=4_194_304)}, ["pid"]),
+            output_schema=_schema(
+                {
+                    "pid": _integer(minimum=1, maximum=4_194_304),
+                    "stdout": _string(min_length=0, max_length=100_000),
+                }
+            ),
+        ),
+        _capability(
+            name="process.zombie_procs",
+            verb="read",
+            object_name="zombie",
+            risk_tier=RiskTier.TIER_0,
+            approval_mode=ApprovalMode.AUTO,
+            is_read_only=True,
+            input_schema=_schema({}),
+            output_schema=_schema({"zombies": _array(max_items=1024)}),
+        ),
+        _capability(
+            name="process.terminate_by_name",
+            verb="terminate",
+            object_name="process",
+            risk_tier=RiskTier.TIER_1,
+            approval_mode=ApprovalMode.HUMAN,
+            is_read_only=False,
+            input_schema=_schema(
+                {
+                    "name": _string(max_length=256),
+                    "signal": {"type": "string", "enum": ["TERM", "KILL"]},
+                },
+                ["name"],
+            ),
+            output_schema=_schema(
+                {
+                    "name": _string(max_length=256),
+                    "signal": {"type": "string", "enum": ["TERM", "KILL"]},
+                }
             ),
             verification_recommendation="command_exit_status_plus_state",
         ),

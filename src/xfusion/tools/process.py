@@ -53,3 +53,45 @@ class ProcessTools:
         return ToolOutput(
             summary=f"Failed to kill PID {pid}: {res.stderr}", data={"error": res.stderr}
         )
+
+    def inspect(self, pid: int) -> ToolOutput:
+        """Detailed inspection of a single PID."""
+        res = self.runner.run(["ps", "-p", str(pid), "-o", "pid,ppid,user,stat,comm,args"])
+        if res.exit_code == 0:
+            return ToolOutput(
+                summary=f"Inspected PID {pid}.",
+                data={"pid": pid, "stdout": res.stdout},
+            )
+        return ToolOutput(
+            summary=f"PID {pid} not found or not inspectable.",
+            data={"error": res.stderr},
+        )
+
+    def zombie_procs(self) -> ToolOutput:
+        """Find zombie (defunct) processes."""
+        res = self.runner.run(["ps", "-eo", "state,pid,comm", "--no-headers"])
+        if res.exit_code != 0:
+            return ToolOutput(summary="Failed to list processes.", data={"error": res.stderr})
+
+        zombies = [
+            line.split(None, 1)[1] for line in res.stdout.splitlines() if line.startswith("Z")
+        ]
+        return ToolOutput(
+            summary=f"Found {len(zombies)} zombie processes."
+            if zombies
+            else "No zombie processes found.",
+            data={"zombies": zombies},
+        )
+
+    def terminate_by_name(self, name: str, signal: str = "TERM") -> ToolOutput:
+        """Terminate processes by name pattern."""
+        res = self.runner.run(["pkill", f"-{signal}", "-f", name])
+        if res.exit_code == 0:
+            return ToolOutput(
+                summary=f"Sent signal {signal} to processes matching '{name}'.",
+                data={"name": name, "signal": signal},
+            )
+        return ToolOutput(
+            summary=f"No processes matching '{name}' found or pkill failed.",
+            data={"error": res.stderr},
+        )

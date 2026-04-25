@@ -164,3 +164,65 @@ class SystemTools:
             summary=f"Failed to restart service {service}: {res.stderr}",
             data={"error": res.stderr},
         )
+
+    def service_reload(self, service: str) -> ToolOutput:
+        """Reload a service using systemctl."""
+        res = self.runner.run(["sudo", "systemctl", "reload", service])
+        if res.exit_code == 0:
+            return ToolOutput(
+                summary=f"Reloaded service {service}.",
+                data={"service": service, "status": "reloaded"},
+            )
+        return ToolOutput(
+            summary=f"Failed to reload service {service}: {res.stderr}",
+            data={"error": res.stderr},
+        )
+
+    def list_services(self) -> ToolOutput:
+        """List active systemd services."""
+        res = self.runner.run(["systemctl", "list-units", "--type=service", "--state=active"])
+        if res.exit_code == 0:
+            return ToolOutput(
+                summary=f"Active services:\n{res.stdout}", data={"stdout": res.stdout}
+            )
+        return ToolOutput(
+            summary=f"Failed to list services: {res.stderr}", data={"error": res.stderr}
+        )
+
+    def restart_failed_services(self) -> ToolOutput:
+        """Find failed services and attempt to restart them."""
+        # Find failed units
+        res = self.runner.run(
+            ["systemctl", "list-units", "--type=service", "--state=failed", "--no-legend"]
+        )
+        if res.exit_code != 0:
+            return ToolOutput(
+                summary="Failed to check for failed services.", data={"error": res.stderr}
+            )
+
+        failed_units = []
+        for line in res.stdout.splitlines():
+            parts = line.split()
+            if parts:
+                failed_units.append(parts[0])
+
+        if not failed_units:
+            return ToolOutput(summary="No failed services found.", data={"failed_units": []})
+
+        restarted = []
+        errors = []
+        for unit in failed_units:
+            restart_res = self.runner.run(["sudo", "systemctl", "restart", unit])
+            if restart_res.exit_code == 0:
+                restarted.append(unit)
+            else:
+                errors.append(f"{unit}: {restart_res.stderr}")
+
+        summary = (
+            f"Attempted to restart {len(failed_units)} services. "
+            f"Successfully restarted: {', '.join(restarted) or 'none'}."
+        )
+        if errors:
+            summary += f" Failures: {'; '.join(errors)}"
+
+        return ToolOutput(summary=summary, data={"restarted": restarted, "errors": errors})

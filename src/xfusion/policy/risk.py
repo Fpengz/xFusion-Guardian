@@ -172,6 +172,9 @@ def classify_risk_traits(
         "system.service_restart",
         "system.service_stop",
         "system.service_start",
+        "system.service_reload",
+        "system.restart_failed_services",
+        "process.terminate_by_name",
     }
     filesystem_mutation = name in {
         "cleanup.safe_disk_cleanup",
@@ -181,12 +184,15 @@ def classify_risk_traits(
         "file.copy",
         "file.chmod",
         "file.chown",
+        "file.append_file",
     }
     network_or_system_config_change = name in {
         "system.package_install",
         "system.firewall_update",
         "system.route_update",
         "system.config_write",
+        "system.package_action",
+        "system.upgrade",
     }
     privilege_required = name in {
         "process.kill",
@@ -196,7 +202,13 @@ def classify_risk_traits(
         "system.service_start",
         "system.service_stop",
         "system.service_restart",
+        "system.service_reload",
+        "system.restart_failed_services",
         "file.chown",
+        "system.package_action",
+        "system.upgrade",
+        "user.add_to_group",
+        "user.remove_from_group",
     }
 
     data_destructive = False
