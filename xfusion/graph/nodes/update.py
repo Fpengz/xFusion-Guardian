@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pydantic import ValidationError
+
 from xfusion.domain.enums import InteractionState, StepStatus
+from xfusion.domain.models.environment import EnvironmentState
 from xfusion.graph.auditing import log_graph_event
 from xfusion.graph.state import AgentGraphState
 
@@ -56,6 +59,22 @@ def update_node(state: AgentGraphState) -> AgentGraphState:
                 state.authorized_step_outputs[step.step_id] = state.step_outputs.get(
                     step.step_id, {}
                 )
+                output = state.step_outputs.get(step.step_id, {})
+                if isinstance(output, dict):
+                    try:
+                        if step.capability == "system.detect_os":
+                            state.environment = EnvironmentState.model_validate(output)
+                        elif step.capability == "system.current_user":
+                            username = output.get("username")
+                            if isinstance(username, str) and username:
+                                state.environment.current_user = username
+                        elif step.capability == "system.check_sudo":
+                            sudo_available = output.get("sudo_available")
+                            if isinstance(sudo_available, bool):
+                                state.environment.sudo_available = sudo_available
+                    except ValidationError:
+                        # Environment refresh should not block state progression.
+                        pass
                 if step.step_id in state.active_repair_step_ids:
                     state.active_repair_step_ids = [
                         repair_step_id

@@ -88,17 +88,23 @@ class TemplateEngine:
 
             # Type validation
             if not self._validate_type(value, param_def.type):
-                errors.append(
-                    f"Parameter '{param_name}' expected type {param_def.type}, got {type(value).__name__}"
+                err_msg = (
+                    f"Parameter '{param_name}' expected type {param_def.type}, "
+                    f"got {type(value).__name__}"
                 )
+                errors.append(err_msg)
                 continue
 
             # Regex validation
-            if param_def.validation and isinstance(value, str):
-                if not re.match(param_def.validation, value):
-                    errors.append(
-                        f"Parameter '{param_name}' value '{value}' does not match pattern {param_def.validation}"
-                    )
+            if (
+                param_def.validation
+                and isinstance(value, str)
+                and not re.match(param_def.validation, value)
+            ):
+                errors.append(
+                    f"Parameter '{param_name}' value '{value}' does not match "
+                    f"pattern {param_def.validation}"
+                )
 
         if errors:
             return TemplateValidationResult(valid=False, errors=errors)

@@ -7,11 +7,10 @@ from enum import StrEnum
 from typing import Any
 
 from xfusion.capabilities.registry import CapabilityRegistry
-from xfusion.capabilities.templates import CommandTemplate, TemplateEngine, TemplateValidationResult
+from xfusion.capabilities.templates import TemplateEngine
 from xfusion.domain.models.capability import CapabilityDefinition
 from xfusion.execution.restricted_shell import (
     RestrictedShellExecutor,
-    ShellExecutionResult,
     ShellRiskLevel,
 )
 from xfusion.policy.categories import PolicyCategory
@@ -55,12 +54,12 @@ class ExecutionOutcome:
 
 class HybridExecutionResolver:
     """Resolver implementing the three-tier hybrid execution model.
-    
+
     Flow:
     1. Try Tier 1: Registered capabilities (first-class, typed operations)
     2. Try Tier 2: Structured command templates (predefined structures)
     3. Fallback to Tier 3: Restricted dynamic shell (last resort)
-    
+
     All tiers pass through shared policy engine for confirmation/execution gating.
     """
 
@@ -83,14 +82,14 @@ class HybridExecutionResolver:
         shell_command: str | None = None,
     ) -> ResolutionResult:
         """Resolve intent to appropriate execution tier.
-        
+
         Args:
             intent: Natural language description of desired action
             llm_selected_tool: Tool selection from LLM (name + arguments)
             template_name: Explicit template name for Tier 2
             template_params: Parameters for template rendering
             shell_command: Raw shell command for Tier 3 fallback
-            
+
         Returns:
             ResolutionResult with tier selection and metadata
         """
@@ -98,11 +97,11 @@ class HybridExecutionResolver:
         if llm_selected_tool:
             tool_name = llm_selected_tool.get("name")
             tool_args = llm_selected_tool.get("arguments", {})
-            
+
             if tool_name and self.capability_registry.has(tool_name):
                 capability = self.capability_registry.require(tool_name)
                 risk_category = self._capability_to_policy_category(capability)
-                
+
                 return ResolutionResult(
                     tier=ExecutionTier.TIER_1_CAPABILITY,
                     success=True,
@@ -117,12 +116,18 @@ class HybridExecutionResolver:
                         "approval_mode": capability.approval_mode.value,
                     },
                 )
-        
+
         # Tier 2: Try structured templates
-        if template_name or (llm_selected_tool and llm_selected_tool.get("type") == "template"):
-            name = template_name or llm_selected_tool.get("name")
-            params = template_params or llm_selected_tool.get("arguments", {})
-            
+        if template_name or (
+            llm_selected_tool and llm_selected_tool.get("type") == "template"
+        ):
+            name = template_name or (
+                llm_selected_tool.get("name") if llm_selected_tool else None
+            )
+            params = template_params or (
+                llm_selected_tool.get("arguments", {}) if llm_selected_tool else {}
+            )
+
             if name:
                 validation = self.template_engine.validate_parameters(name, params)
                 if validation.valid and validation.resolved_command:
@@ -142,15 +147,19 @@ class HybridExecutionResolver:
                                 "rendered_command": validation.resolved_command,
                             },
                         )
-        
+
         # Tier 3: Restricted shell fallback
-        if shell_command or (llm_selected_tool and llm_selected_tool.get("type") == "shell"):
-            command = shell_command or llm_selected_tool.get("command")
-            
+        if shell_command or (
+            llm_selected_tool and llm_selected_tool.get("type") == "shell"
+        ):
+            command = shell_command or (
+                llm_selected_tool.get("command") if llm_selected_tool else None
+            )
+
             if command:
                 risk_level = self.shell_executor.classify_command(command)
                 policy_category = self.shell_executor.to_policy_category(risk_level)
-                
+
                 # Check if command is forbidden
                 if risk_level == ShellRiskLevel.FORBIDDEN:
                     return ResolutionResult(
@@ -163,7 +172,7 @@ class HybridExecutionResolver:
                         error="Command classified as forbidden - cannot execute",
                         metadata={"risk_level": risk_level.value},
                     )
-                
+
                 return ResolutionResult(
                     tier=ExecutionTier.TIER_3_RESTRICTED_SHELL,
                     success=True,
@@ -176,7 +185,7 @@ class HybridExecutionResolver:
                         "risk_level": risk_level.value,
                     },
                 )
-        
+
         # No tier matched
         return ResolutionResult(
             tier=ExecutionTier.TIER_3_RESTRICTED_SHELL,
@@ -191,12 +200,12 @@ class HybridExecutionResolver:
         admin_approved: bool = False,
     ) -> ExecutionOutcome:
         """Execute resolved command with confirmation gating.
-        
+
         Args:
             resolution: Result from resolve()
             confirmed: User confirmation obtained
             admin_approved: Admin approval obtained (for privileged actions)
-            
+
         Returns:
             ExecutionOutcome with results and audit data
         """
@@ -210,7 +219,7 @@ class HybridExecutionResolver:
                 confirmation_obtained=False,
                 audit_data={"error": "Confirmation required but not obtained"},
             )
-        
+
         if resolution.requires_admin and not admin_approved:
             return ExecutionOutcome(
                 tier=resolution.tier,
@@ -220,7 +229,7 @@ class HybridExecutionResolver:
                 confirmation_obtained=confirmed,
                 audit_data={"error": "Admin approval required but not obtained"},
             )
-        
+
         # Execute based on tier
         if resolution.tier == ExecutionTier.TIER_1_CAPABILITY:
             # Tier 1 execution would happen via tool registry
@@ -228,12 +237,15 @@ class HybridExecutionResolver:
             return ExecutionOutcome(
                 tier=resolution.tier,
                 success=True,
-                output={"status": "executed_via_capability", "capability": resolution.capability_name},
+                output={
+                    "status": "executed_via_capability",
+                    "capability": resolution.capability_name,
+                },
                 risk_category=resolution.risk_level or PolicyCategory.READ_ONLY,
                 confirmation_obtained=confirmed,
                 audit_data=resolution.metadata,
             )
-        
+
         elif resolution.tier == ExecutionTier.TIER_2_TEMPLATE:
             # Tier 2: Execute rendered command via restricted shell
             if not resolution.command:
@@ -245,7 +257,7 @@ class HybridExecutionResolver:
                     confirmation_obtained=confirmed,
                     audit_data={"error": "No rendered command available"},
                 )
-            
+
             result = self.shell_executor.execute(resolution.command)
             return ExecutionOutcome(
                 tier=resolution.tier,
@@ -263,7 +275,7 @@ class HybridExecutionResolver:
                     "timeout_occurred": result.timeout_occurred,
                 },
             )
-        
+
         elif resolution.tier == ExecutionTier.TIER_3_RESTRICTED_SHELL:
             # Tier 3: Execute via restricted shell
             if not resolution.command:
@@ -275,7 +287,7 @@ class HybridExecutionResolver:
                     confirmation_obtained=confirmed,
                     audit_data={"error": "No command available for execution"},
                 )
-            
+
             result = self.shell_executor.execute(resolution.command)
             return ExecutionOutcome(
                 tier=resolution.tier,
@@ -294,7 +306,7 @@ class HybridExecutionResolver:
                     "safety_violation": result.safety_violation,
                 },
             )
-        
+
         # Unknown tier
         return ExecutionOutcome(
             tier=resolution.tier,
@@ -305,49 +317,46 @@ class HybridExecutionResolver:
             audit_data={"error": f"Unknown execution tier: {resolution.tier}"},
         )
 
-    def _capability_to_policy_category(
-        self, capability: CapabilityDefinition
-    ) -> PolicyCategory:
+    def _capability_to_policy_category(self, capability: CapabilityDefinition) -> PolicyCategory:
         """Map capability risk tier and approval mode to policy category."""
         from xfusion.domain.enums import ApprovalMode, RiskTier
-        
+
         # Forbidden capabilities
         if capability.approval_mode == ApprovalMode.DENY:
             return PolicyCategory.FORBIDDEN
-        
+
         # Privileged: high risk tier + admin approval
         if (
             capability.risk_tier in (RiskTier.TIER_2, RiskTier.TIER_3)
             and capability.approval_mode == ApprovalMode.ADMIN
         ):
             return PolicyCategory.PRIVILEGED
-        
+
         # Destructive: requires human approval and not read-only
-        if (
-            capability.approval_mode == ApprovalMode.HUMAN
-            and not capability.is_read_only
-        ):
+        if capability.approval_mode == ApprovalMode.HUMAN and not capability.is_read_only:
             # Check if it's a destructive operation by name
             destructive_verbs = {"delete", "terminate", "destroy", "remove"}
             if any(verb in capability.verb.lower() for verb in destructive_verbs):
                 return PolicyCategory.DESTRUCTIVE
             return PolicyCategory.WRITE_SAFE
-        
+
         # Read-only operations
         if capability.is_read_only:
             return PolicyCategory.READ_ONLY
-        
+
         # Default to write_safe
         return PolicyCategory.WRITE_SAFE
 
     def _requires_confirmation(self, category: PolicyCategory) -> bool:
         """Check if a policy category requires confirmation."""
         from xfusion.policy.categories import requires_confirmation
+
         return requires_confirmation(category)
 
     def _requires_admin(self, category: PolicyCategory) -> bool:
         """Check if a policy category requires admin permission."""
         from xfusion.policy.categories import requires_admin_permission
+
         return requires_admin_permission(category)
 
     def list_capabilities(self) -> list[dict[str, Any]]:

@@ -154,3 +154,39 @@ def test_executed_tools_differ_from_plan_on_abort():
     # kill_process should NOT have been executed
     assert "process.kill" not in registry.executed_tools
     assert len(registry.executed_tools) == 1
+
+
+def test_file_glob_search_under_path_is_planned_without_disambiguation():
+    registry = MockRegistry(
+        {
+            "file.search": ToolOutput(
+                summary="Found",
+                data={"matches": ["/tmp/example.md"], "limit": 50},
+            )
+        }
+    )
+    initial_env = EnvironmentState()
+    graph = build_agent_graph(registry).compile()
+
+    state = {
+        "user_input": "find all *.md files under /docs/spec",
+        "environment": initial_env,
+        "language": "en",
+        "plan": None,
+        "current_step_id": None,
+        "policy_decision": None,
+        "verification_result": None,
+        "last_tool_output": None,
+        "pending_confirmation_phrase": None,
+        "response": "",
+        "audit_records": [],
+    }
+
+    result = graph.invoke(state)
+    assert result["plan"].interaction_state == InteractionState.COMPLETED
+    assert len(result["plan"].steps) == 1
+    step = result["plan"].steps[0]
+    assert step.capability == "file.search"
+    assert step.args["query"] == "*.md"
+    assert step.args["path"] == "/docs/spec"
+    assert registry.executed_tools == ["file.search"]

@@ -5,13 +5,13 @@ from xfusion.roles.contracts import (
     enforce_role_proposal,
 )
 from xfusion.roles.specialists import (
+    DiagnosisAgent,
+    ExplanationAgent,
+    ObservationAgent,
+    PlanningAgent,
     SpecialistAgent,
     SupervisorAgent,
-    ObservationAgent,
-    DiagnosisAgent,
-    PlanningAgent,
     VerificationAgent,
-    ExplanationAgent,
     build_specialist_agents,
 )
 

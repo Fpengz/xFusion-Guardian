@@ -40,23 +40,20 @@ def _format_normal_response(
     *,
     source_record: dict[str, object] | None,
 ) -> str:
-    if _should_render_command_transcript(state, source_record):
-        about_to_run = _format_trace_commands(source_record, key="planned_argv")
-        ran = _format_trace_commands(source_record, key="ran_argv")
-        output = _format_trace_output_snippet(source_record)
-        meaning = _first_nonempty_line(_action_summary(source_record, fallback=state.response))
-        return "\n".join(
-            [
-                f"About to run: {about_to_run}",
-                f"Ran: {ran}",
-                f"Output: {output}",
-                f"What this means: {meaning or 'Execution completed.'}",
-            ]
-        )
-
     result = _result_summary(state, source_record)
+    about_to_run = _about_to_run_summary(state, source_record)
+    ran = _ran_summary(state, source_record)
+    output = _output_summary(state, source_record)
+    meaning = _meaning_summary(state, source_record, fallback=result)
     verification = _verification_summary(state, source_record)
-    lines = [f"Result: {result}", f"Verification: {verification}"]
+    lines = [
+        f"Result: {result}",
+        f"About to run: {about_to_run}",
+        f"Ran: {ran}",
+        f"Output: {output}",
+        f"What this means: {meaning}",
+        f"Verification: {verification}",
+    ]
     next_actions = _next_actions(state)
     if next_actions:
         lines.append("Next actions:")
@@ -248,6 +245,64 @@ def _should_render_command_transcript(
     except KeyError:
         return False
     return bool(definition.is_read_only and _extract_command_trace(source_record))
+
+
+def _about_to_run_summary(state: AgentGraphState, source_record: dict[str, object] | None) -> str:
+    traced = _format_trace_commands(source_record, key="planned_argv")
+    if traced != "No command trace recorded.":
+        return traced
+    if not state.plan:
+        return "No command planned."
+    if not state.plan.steps:
+        return "No command planned."
+    capabilities = ", ".join(str(step.capability) for step in state.plan.steps)
+    if state.plan.interaction_state == InteractionState.AWAITING_DISAMBIGUATION:
+        return (
+            "No command planned yet; awaiting clarification. "
+            f"Draft capability scope: {capabilities}."
+        )
+    return f"No shell command trace recorded. Planned capability path: {capabilities}."
+
+
+def _ran_summary(state: AgentGraphState, source_record: dict[str, object] | None) -> str:
+    traced = _format_trace_commands(source_record, key="ran_argv")
+    if traced != "No command trace recorded.":
+        return traced
+    if not state.plan:
+        return "No command ran."
+    if state.plan.interaction_state in {
+        InteractionState.AWAITING_CONFIRMATION,
+        InteractionState.AWAITING_DISAMBIGUATION,
+        InteractionState.REFUSED,
+    }:
+        return "No command ran."
+    return "No command trace recorded by adapter runtime."
+
+
+def _output_summary(state: AgentGraphState, source_record: dict[str, object] | None) -> str:
+    trace_output = _format_trace_output_snippet(source_record)
+    if trace_output != "No output snippet recorded.":
+        return trace_output
+    if source_record and source_record.get("normalized_output"):
+        return _clip_text(str(source_record.get("normalized_output")), limit=240)
+    action = _action_summary(source_record, fallback=state.response)
+    first = _first_nonempty_line(action)
+    if first:
+        return first
+    return "No command output recorded."
+
+
+def _meaning_summary(
+    state: AgentGraphState,
+    source_record: dict[str, object] | None,
+    *,
+    fallback: str,
+) -> str:
+    meaning = _first_nonempty_line(_action_summary(source_record, fallback=state.response))
+    if meaning:
+        return meaning
+    first = _first_nonempty_line(fallback)
+    return first or "Execution completed."
 
 
 def _capability_from_source_record(source_record: dict[str, object] | None) -> str:

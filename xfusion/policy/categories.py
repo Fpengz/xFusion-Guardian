@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Literal
 
 
 class PolicyCategory(StrEnum):
@@ -59,7 +58,9 @@ POLICY_CATEGORIES: dict[PolicyCategory, PolicyCategoryDefinition] = {
     ),
     PolicyCategory.FORBIDDEN: PolicyCategoryDefinition(
         category=PolicyCategory.FORBIDDEN,
-        description="Never allowed through the agent, cannot be bypassed by normal user confirmation",
+        description=(
+            "Never allowed through the agent, cannot be bypassed by normal user confirmation"
+        ),
         confirmation_required=False,
         admin_permission_required=False,
         allowed_without_review=False,

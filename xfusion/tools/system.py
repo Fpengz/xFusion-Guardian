@@ -27,9 +27,30 @@ class SystemTools:
                     state.distro_family = line.split("=")[1].strip('"')
                 if line.startswith("VERSION_ID="):
                     state.distro_version = line.split("=")[1].strip('"')
+        else:
+            # Cross-platform fallback for non-Linux hosts (for local development UX).
+            uname_sys = self.runner.run(["uname", "-s"])
+            if uname_sys.exit_code == 0:
+                system_name = uname_sys.stdout.strip().lower()
+                if system_name == "darwin":
+                    state.distro_family = "darwin"
+                elif system_name:
+                    state.distro_family = system_name
+
+            uname_rel = self.runner.run(["uname", "-r"])
+            if uname_rel.exit_code == 0:
+                state.distro_version = uname_rel.stdout.strip() or "unknown"
+            if state.distro_family == "darwin":
+                mac_ver = self.runner.run(["sw_vers", "-productVersion"])
+                if mac_ver.exit_code == 0 and mac_ver.stdout.strip():
+                    state.distro_version = mac_ver.stdout.strip()
 
         # Detect user
         state.current_user = os.environ.get("USER") or os.environ.get("LOGNAME") or "unknown"
+        if state.current_user == "unknown":
+            user_res = self.runner.run(["id", "-un"])
+            if user_res.exit_code == 0 and user_res.stdout.strip():
+                state.current_user = user_res.stdout.strip()
 
         # Sudo availability
         res = self.runner.run(["sudo", "-n", "true"])
@@ -45,6 +66,8 @@ class SystemTools:
             state.package_manager = "yum"
         elif shutil.which("dnf"):
             state.package_manager = "dnf"
+        elif shutil.which("brew"):
+            state.package_manager = "brew"
 
         # Coarse environment signal used by policy and cleanup planning.
         res = self.runner.run(["df", "/", "--output=pcent"])
