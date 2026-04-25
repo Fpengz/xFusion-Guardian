@@ -55,7 +55,7 @@ def _extract_search_path(raw_input: str) -> str | None:
 def plan_node(state: AgentGraphState) -> AgentGraphState:
     """Create an ExecutionPlan using LLM-driven capability resolution.
 
-    v0.2.4.3: The LLM acts as the router, selecting capabilities from the registry
+    v0.2.4.4: The LLM acts as the router, selecting capabilities from the registry
     based on natural language intent, similar to how agents load tools.
 
     Flow:

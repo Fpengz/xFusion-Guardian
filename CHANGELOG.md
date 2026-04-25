@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.2.4.4 - 2026-04-25
+
+- Implemented Conversation Gateway for intent-based classification and
+  operational safety routing.
+- Overhauled TUI with modular widget architecture, theme support, and compact
+  cockpit layout.
+- Migrated codebase to standard `src/` layout with improved packaging.
+- Added comprehensive integration tests for Gateway routing and TUI components.
+
+## v0.2.4.3 - 2026-04-25
+
+- Added spec for Agent-Led Hybrid Execution and Conversation Gateway.
+- Synchronized domain contracts with gateway-enforced trust boundaries.
+
+## v0.2.4.2 - 2026-04-24
+
+- Replaced hardcoded planning chains with LLM-driven capability resolution and
+  automatic parameter extraction.
+- Simplified execution graph by delegating intent matching to a dedicated
+  Capability Resolver with keyword fallback.
+
 ## v0.2.4.1 - 2026-04-24
 
 - Added deterministic per-step command trace capture to the execution pipeline

@@ -1,8 +1,8 @@
-# XFusion v0.2.4.3 Spec: Agent-Led Hybrid Execution
+# XFusion v0.2.4.4 Spec: Agent-Led Hybrid Execution
 
 ## Summary
 
-XFusion v0.2.4.3 introduces a Conversation Gateway before orchestration and an
+XFusion v0.2.4.4 introduces a Conversation Gateway before orchestration and an
 agent-led hybrid execution model inside operational flows. The gateway classifies
 user input as conversational, clarification-required, or operational before the
 LangGraph pipeline can run. Agents perform intent interpretation,
@@ -86,7 +86,7 @@ bypass safer abstractions.
 
 ## Agent Roles
 
-v0.2.4.3 defines four agent roles:
+v0.2.4.4 defines four agent roles:
 
 - `Intent_Agent`: parses natural language into structured intent, target, and
   scope.
@@ -153,7 +153,7 @@ ceiling and denial layer used to prevent under-classified catastrophic actions.
 
 ## Plan And Policy Contracts
 
-`PlanStep` includes v0.2.4.3 execution metadata:
+`PlanStep` includes v0.2.4.4 execution metadata:
 
 - `execution_surface`
 - `policy_category`
@@ -222,7 +222,7 @@ or capability registry. Promotion must attach tests, policy metadata, review
 status, usage statistics, and revocation support.
 
 Runtime registration APIs and automated promotion are out of scope for
-v0.2.4.3.
+v0.2.4.4.
 
 ## Audit Requirements
 
@@ -256,7 +256,7 @@ Required tests:
 
 ## Current Implementation Notes
 
-v0.2.4.3 adds the domain contracts and guardrails needed for agent-led hybrid
+v0.2.4.4 adds the domain contracts and guardrails needed for agent-led hybrid
 execution while keeping existing capability graph workflows operational. Full
 runtime routing of every graph step through all three surfaces remains an
 incremental follow-on; the implemented resolver and contracts define the
